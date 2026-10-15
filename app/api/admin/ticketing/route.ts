@@ -1,0 +1,216 @@
+import { NextResponse } from 'next/server';
+import { getAdminSession, isSameOriginRequest } from '@/lib/adminAccess.server';
+import { createServerSupabaseClient } from '@/lib/serverSupabase';
+
+export const dynamic = 'force-dynamic';
+
+const eventFields = 'id,organizer_id,title,slug,description,venue_name,venue_address,city,timezone,starts_at,ends_at,doors_open_at,age_limit,capacity,status,cancellation_policy,cover_image_url,published_at,created_at,updated_at';
+const ticketTypeFields = 'id,event_id,name,description,price_minor,currency,capacity,min_per_order,max_per_order,sales_start_at,sales_end_at,benefits,status,created_at,updated_at';
+
+async function authorize() {
+  const session = await getAdminSession();
+  if (!session) {
+    return { session: null, response: NextResponse.json({ error: 'Admin access is required.' }, { status: 401 }) };
+  }
+  if (!['owner', 'admin'].includes(session.role.toLowerCase())) {
+    return { session: null, response: NextResponse.json({ error: 'Ticketing management is restricted to platform admins.' }, { status: 403 }) };
+  }
+  return { session, response: null };
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
+}
+
+function parseDate(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim();
+  const isLocalDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(normalized);
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+  if (!isLocalDateTime && !hasTimezone) return null;
+  const date = new Date(isLocalDateTime ? `${normalized}+03:00` : normalized);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function parseMoney(value: unknown) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const normalized = String(value).trim();
+  if (!/^\d{1,9}(?:\.\d{1,2})?$/.test(normalized)) return null;
+  const [whole, fraction = ''] = normalized.split('.');
+  const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(amount) ? amount : null;
+}
+
+function missingMigration(error: { code?: string; message?: string }) {
+  return error.code === '42P01' || error.code === 'PGRST205'
+    || (error.message || '').toLowerCase().includes('ticketing_');
+}
+
+export async function GET() {
+  const { response } = await authorize();
+  if (response) return response;
+  const database = createServerSupabaseClient();
+  if (!database) return NextResponse.json({ error: 'Ticketing storage is not configured.' }, { status: 503 });
+
+  const [eventsResult, eventCount, ticketCount, orderCount] = await Promise.all([
+    database.from('ticketing_events').select(eventFields).order('starts_at', { ascending: true }).limit(100),
+    database.from('ticketing_events').select('id', { count: 'exact', head: true }),
+    database.from('ticketing_tickets').select('id', { count: 'exact', head: true }),
+    database.from('ticketing_orders').select('id', { count: 'exact', head: true })
+  ]);
+  const queryError = eventsResult.error || eventCount.error || ticketCount.error || orderCount.error;
+  if (queryError) {
+    if (missingMigration(queryError)) {
+      return NextResponse.json({
+        error: 'Apply supabase/TICKETING_CORE_MIGRATION.sql to the shared Supabase project to initialize the isolated Ticketing system.'
+      }, { status: 503 });
+    }
+    console.error('[TicketingAdmin] Could not load ticketing dashboard:', queryError);
+    return NextResponse.json({ error: 'Ticketing dashboard data could not be loaded.' }, { status: 503 });
+  }
+
+  const events = eventsResult.data || [];
+  const eventIds = events.map(event => event.id);
+  const ticketTypesResult = eventIds.length
+    ? await database.from('ticketing_ticket_types').select(ticketTypeFields).in('event_id', eventIds).order('created_at')
+    : { data: [], error: null };
+  if (ticketTypesResult.error) {
+    console.error('[TicketingAdmin] Could not load ticket tiers:', ticketTypesResult.error);
+    return NextResponse.json({ error: 'Ticket tiers could not be loaded.' }, { status: 503 });
+  }
+
+  const typesByEvent = new Map<string, typeof ticketTypesResult.data>();
+  for (const type of ticketTypesResult.data || []) {
+    typesByEvent.set(type.event_id, [...(typesByEvent.get(type.event_id) || []), type]);
+  }
+  return NextResponse.json({
+    events: events.map(event => ({ ...event, ticket_types: typesByEvent.get(event.id) || [] })),
+    totals: {
+      events: eventCount.count || 0,
+      tickets: ticketCount.count || 0,
+      orders: orderCount.count || 0
+    }
+  }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+}
+
+export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
+  }
+  const { session, response } = await authorize();
+  if (response) return response;
+  const database = createServerSupabaseClient();
+  if (!database) return NextResponse.json({ error: 'Ticketing storage is not configured.' }, { status: 503 });
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: 'A valid ticketing request is required.' }, { status: 400 });
+  }
+
+  if (body.action === 'create_event') {
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    const venueName = typeof body.venueName === 'string' ? body.venueName.trim() : '';
+    const city = typeof body.city === 'string' ? body.city.trim() : '';
+    const startsAt = parseDate(body.startsAt);
+    const endsAt = parseDate(body.endsAt);
+    const doorsOpenAt = body.doorsOpenAt ? parseDate(body.doorsOpenAt) : null;
+    const capacity = body.capacity === '' || body.capacity === null || body.capacity === undefined
+      ? null : Number(body.capacity);
+    const ageLimit = body.ageLimit === '' || body.ageLimit === null || body.ageLimit === undefined
+      ? null : Number(body.ageLimit);
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+    const venueAddress = typeof body.venueAddress === 'string' ? body.venueAddress.trim() : '';
+    const cancellationPolicy = typeof body.cancellationPolicy === 'string' ? body.cancellationPolicy.trim() : '';
+
+    if (title.length < 3 || title.length > 160 || venueName.length < 2 || venueName.length > 180
+      || city.length < 2 || city.length > 100 || !startsAt || !endsAt || new Date(endsAt) <= new Date(startsAt)
+      || (body.doorsOpenAt && (!doorsOpenAt || new Date(doorsOpenAt) > new Date(startsAt)))
+      || (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000))
+      || (ageLimit !== null && (!Number.isSafeInteger(ageLimit) || ageLimit < 0 || ageLimit > 120))
+      || description.length > 10_000 || venueAddress.length > 500 || cancellationPolicy.length > 5_000) {
+      return NextResponse.json({ error: 'Enter a valid event title, venue, city and date range. End time must be after start time.' }, { status: 400 });
+    }
+
+    const organizerResult = await database.from('ticketing_organizers').select('id').eq('slug', 'online-bar').maybeSingle();
+    if (organizerResult.error || !organizerResult.data) {
+      console.error('[TicketingAdmin] Default organizer is unavailable:', organizerResult.error);
+      return NextResponse.json({ error: 'The ONLINE BAR organizer record is unavailable. Apply the ticketing database migration.' }, { status: 503 });
+    }
+
+    const slug = `${slugify(title) || 'event'}-${crypto.randomUUID().slice(0, 8)}`;
+    const { data, error } = await database.rpc('ticketing_create_event', {
+      p_organizer_id: organizerResult.data.id,
+      p_title: title,
+      p_slug: slug,
+      p_description: description,
+      p_venue_name: venueName,
+      p_venue_address: venueAddress,
+      p_city: city,
+      p_starts_at: startsAt,
+      p_ends_at: endsAt,
+      p_doors_open_at: doorsOpenAt,
+      p_age_limit: ageLimit,
+      p_capacity: capacity,
+      p_cancellation_policy: cancellationPolicy,
+      p_actor_email: session?.email || ''
+    });
+    if (error || !data) {
+      console.error('[TicketingAdmin] Could not create draft event:', error);
+      return NextResponse.json({ error: 'The draft event could not be saved.' }, { status: 503 });
+    }
+    return NextResponse.json({ event: { ...(data as Record<string, unknown>), ticket_types: [] } }, { status: 201 });
+  }
+
+  if (body.action === 'create_ticket_type') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+    const priceMinor = parseMoney(body.price);
+    const capacity = Number(body.capacity);
+    const minPerOrder = Number(body.minPerOrder ?? 1);
+    const maxPerOrder = Number(body.maxPerOrder ?? 10);
+    const salesStartAt = body.salesStartAt ? parseDate(body.salesStartAt) : null;
+    const salesEndAt = body.salesEndAt ? parseDate(body.salesEndAt) : null;
+    if (!/^[0-9a-f-]{36}$/i.test(eventId) || name.length < 2 || name.length > 100
+      || description.length > 2_000 || priceMinor === null
+      || !Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000
+      || !Number.isSafeInteger(minPerOrder) || !Number.isSafeInteger(maxPerOrder)
+      || minPerOrder < 1 || maxPerOrder < minPerOrder || maxPerOrder > 100
+      || (body.salesStartAt && !salesStartAt) || (body.salesEndAt && !salesEndAt)
+      || (salesStartAt && salesEndAt && new Date(salesEndAt) <= new Date(salesStartAt))) {
+      return NextResponse.json({ error: 'Enter a valid tier name, price, capacity, order limit and sale window.' }, { status: 400 });
+    }
+
+    const { data, error } = await database.rpc('ticketing_create_ticket_type', {
+      p_event_id: eventId,
+      p_name: name,
+      p_description: description,
+      p_price_minor: priceMinor,
+      p_capacity: capacity,
+      p_min_per_order: minPerOrder,
+      p_max_per_order: maxPerOrder,
+      p_sales_start_at: salesStartAt,
+      p_sales_end_at: salesEndAt,
+      p_actor_email: session?.email || ''
+    });
+    if (error || !data) {
+      console.error('[TicketingAdmin] Could not create ticket tier:', error);
+      if (error?.code === '23514') {
+        return NextResponse.json({ error: 'This tier exceeds the event capacity. Reduce its allocation before saving.' }, { status: 400 });
+      }
+      if (error?.code === 'P0001') {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+      if (error?.code === 'P0002') {
+        return NextResponse.json({ error: 'The selected event was not found.' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'The ticket tier could not be saved.' }, { status: 503 });
+    }
+    return NextResponse.json({ ticketType: data as Record<string, unknown> }, { status: 201 });
+  }
+
+  return NextResponse.json({ error: 'Choose a supported ticketing action.' }, { status: 400 });
+}
