@@ -1,6 +1,6 @@
 # ONLINE BAR Ticketing module
 
-This repository contains the isolated Ticketing source exported from the ONLINE BAR application. It is a **host-application module**, not a standalone deployable website: its Next.js routes rely on ONLINE BAR's existing admin session and server-side Supabase client.
+This repository is the standalone Next.js host for ONLINE BAR Ticketing. It contains the Halloween-themed public event pages, a password-protected admin workspace, server-side Supabase integration, and Ticketing-only schema migrations.
 
 ## Source layout
 
@@ -10,18 +10,21 @@ This repository contains the isolated Ticketing source exported from the ONLINE 
 - `lib/ticketing/` — server-only public event listing using approved organizers and on-sale events.
 - `supabase/` — isolated Ticketing core, security and live-operations schema migrations.
 - `ticketing/README.md` — implementation status, setup notes and release gates.
+- `app/admin/login/` — dedicated Ticketing administrator sign-in.
 
-## Integrating with ONLINE BAR
+## Vercel deployment
 
-Copy these paths into the matching paths of the ONLINE BAR Next.js application. The host app must provide:
+Import `Davi-d-M/TICKETING` into Vercel and use the repository root as the Root Directory. Vercel detects Next.js from `package.json`; use `npm run build` as the build command and leave the output directory at its default. Production and Preview builds succeed without database credentials, but event listings will explain that setup is pending.
 
-- Next.js 15, React, TypeScript, Tailwind CSS and `lucide-react`.
-- `@/lib/adminAccess.server` with `getAdminSession` and `isSameOriginRequest`.
-- `@/lib/serverSupabase` with a server-only Supabase client using the service-role key.
-- An admin dashboard layout that protects `/admin/ticketing`, `/admin/ticketing/security` and `/admin/ticketing/live`.
-- A public navigation link to `/tickets`.
+Configure these server-only variables in the Vercel project before enabling the admin or database-backed pages:
 
-Keep `SUPABASE_SERVICE_ROLE_KEY` server-side. Never expose it in client code or commit credentials.
+- `TICKETING_ADMIN_EMAIL` — dedicated Ticketing administrator email.
+- `TICKETING_ADMIN_PASSWORD` — a unique high-entropy password.
+- `TICKETING_SESSION_SECRET` — independent random value of at least 32 characters.
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (public URL, not a secret).
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key; server-side only.
+
+Set `TICKETING_ADMIN_ROLE=admin` only if the account should not have owner-only case controls; omit it for the dedicated owner. After changing environment variables, redeploy. The admin login is at `/admin/login`.
 
 ## Database setup
 
@@ -34,6 +37,17 @@ After reviewing the SQL and confirming the target Supabase project, apply in thi
 The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
 
 The Live Operations view reads committed operational changes from an append-only, allowlisted database journal. It polls the protected API every five seconds and recovers using an event cursor; it is not a push/WebSocket connection or an external security log. It deliberately omits buyer contact details, payment payloads and ticket credential hashes.
+
+## Local development
+
+Use Node.js 20 or later:
+
+```sh
+npm install
+npm run dev
+```
+
+The site shell and browse-only pages work without environment variables; database-backed listings show a setup message until Supabase is configured.
 
 ## Important: sales are not enabled
 
