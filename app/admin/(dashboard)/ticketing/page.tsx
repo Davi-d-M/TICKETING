@@ -311,6 +311,7 @@ export default function TicketingPage() {
             </div>
             <div className="flex gap-2">
               <Link href="/admin/ticketing/security" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/5 px-4 text-sm font-bold text-violet-100 transition hover:bg-violet-300/10"><ShieldAlert size={15} /> Trust centre</Link>
+              <Link href="/admin/ticketing/live" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/5 px-4 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/10"><ScanLine size={15} /> Live operations</Link>
               <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 text-sm font-bold text-white transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
               <button type="button" onClick={() => setAddingEvent(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-400 px-4 text-sm font-black text-[#170d18] shadow-lg shadow-orange-950/30 transition hover:bg-orange-300"><Plus size={16} /> New event</button>
             </div>

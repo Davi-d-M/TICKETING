@@ -10,8 +10,10 @@ The Ticketing control centre is an isolated Online Bar Admin module at `/admin/t
 - The core migration establishes isolated records for organizers, events, ticket tiers, reservations, orders, payment attempts and webhook deduplication, individual tickets, gate check-ins, refunds, promotions, notification jobs, and audit history.
 - The reservation and gate-check-in database functions are transactional and use ticket-level locking to prevent overselling and duplicate admission.
 - The Halloween-themed Trust & Security Centre records manually reported security cases, owner-only case assignment/status changes, and append-only case activity in the dedicated security migration.
-- Ticketing security case history is not an automated monitoring feed. MFA enforcement, payment callbacks, customer isolation, five-minute QR rotation, scanner sessions, external security logging, and backup verification remain unimplemented.
+- The Halloween Live Operations page reads committed Ticketing database activity and current record counts through admin-only APIs. Its database trigger journal excludes buyer contact information, payment payloads and credential hashes; the page polls every five seconds and recovers from a cursor, but is not a push/WebSocket feed.
+- The live operations journal is not a substitute for protected external security logging or automated attack detection. MFA enforcement, provider payment callbacks, customer isolation, five-minute QR rotation, authorized scanner sessions, and backup verification remain unimplemented.
 - Customer checkout, Daraja/Paystack payment verification, ticket issuance, transfer/refund operations, transactional notifications, and staff scanner access are not enabled in this initial phase. No customer can buy tickets from the public pages.
+- The Android application currently wraps the Online Bar website and has no customer ticket wallet; website screenshot detection is not reliably available, and Android wallet screenshot defenses cannot be considered active until that wallet screen and its authorization flow exist.
 
 ## Complete product scope
 
@@ -29,7 +31,7 @@ These are product targets, not features that the current draft-only phase claims
 
 ## Database setup
 
-Apply `supabase/TICKETING_CORE_MIGRATION.sql` and then `supabase/TICKETING_SECURITY_MIGRATION.sql` to the same Supabase project used by Online Bar Admin. The migrations use only the `ticketing_*` namespace, enable RLS, revoke direct browser access, and grant server-side access to `service_role` only where needed. Security case activity and security events are append-only to the application service role; case assignment/status changes run through an audited database function. Review both SQL files and confirm the target project before applying them.
+Apply `supabase/TICKETING_CORE_MIGRATION.sql`, then `supabase/TICKETING_SECURITY_MIGRATION.sql`, then `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql` to the same Supabase project used by Online Bar Admin. The migrations use only the `ticketing_*` namespace, enable RLS, revoke direct browser access, and grant server-side access to `service_role` only where needed. Security case activity and security events are append-only to the application service role; case assignment/status changes run through an audited database function. The live operations journal records only allowlisted operational metadata. Review all SQL files and confirm the target project before applying them.
 
 The platform must keep its service-role key server-side. API access to the Admin control centre requires an authenticated Online Bar owner or admin session. Do not put payment credentials in client-side environment variables.
 
