@@ -13,6 +13,7 @@ export type PublicTicketType = {
   max_per_order: number;
   capacity: number;
   remaining: number;
+  benefits: string[];
   sales_start_at: string | null;
   sales_end_at: string | null;
 };
@@ -31,6 +32,14 @@ export type PublicTicketEvent = {
   doors_open_at: string | null;
   age_limit: number | null;
   cover_image_url: string | null;
+  venue_maps_url: string;
+  venue_latitude: number | null;
+  venue_longitude: number | null;
+  entrance_instructions: string;
+  parking_details: string;
+  transport_guidance: string;
+  dress_code: string;
+  service_fee_minor: number;
   cancellation_policy: string;
   ticket_types: PublicTicketType[];
 };
@@ -44,12 +53,14 @@ type PublicEventsResult =
 const eventFields = [
   'id', 'organizer_id', 'title', 'slug', 'description', 'venue_name', 'venue_address',
   'city', 'timezone', 'starts_at', 'ends_at', 'doors_open_at', 'age_limit',
-  'cover_image_url', 'cancellation_policy'
+  'cover_image_url', 'venue_maps_url', 'venue_latitude', 'venue_longitude',
+  'entrance_instructions', 'parking_details', 'transport_guidance', 'dress_code',
+  'service_fee_minor', 'cancellation_policy'
 ].join(',');
 
 const tierFields = [
   'id', 'event_id', 'name', 'description', 'price_minor', 'currency',
-  'min_per_order', 'max_per_order', 'capacity', 'sales_start_at', 'sales_end_at'
+  'min_per_order', 'max_per_order', 'capacity', 'benefits', 'sales_start_at', 'sales_end_at'
 ].join(',');
 
 function isMissingTicketingSchema(error: { code?: string }) {
@@ -179,6 +190,14 @@ async function getPublicEvents(): Promise<PublicEventsResult> {
       doors_open_at: event.doors_open_at,
       age_limit: event.age_limit,
       cover_image_url: event.cover_image_url,
+      venue_maps_url: event.venue_maps_url,
+      venue_latitude: event.venue_latitude,
+      venue_longitude: event.venue_longitude,
+      entrance_instructions: event.entrance_instructions,
+      parking_details: event.parking_details,
+      transport_guidance: event.transport_guidance,
+      dress_code: event.dress_code,
+      service_fee_minor: Number(event.service_fee_minor) || 0,
       cancellation_policy: event.cancellation_policy,
       ticket_types: typesByEvent.get(event.id) || []
     }))

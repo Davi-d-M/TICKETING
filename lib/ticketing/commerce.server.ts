@@ -85,7 +85,9 @@ export async function isTicketingSalesReady() {
     database.from('ticketing_payment_attempts').select('checkout_url').limit(0),
     database.from('ticketing_tickets').select('credential_ciphertext').limit(0),
     database.from('ticketing_guest_access_links').select('id').limit(0),
-    database.from('ticketing_gate_staff_assignments').select('event_id').limit(0)
+    database.from('ticketing_gate_staff_assignments').select('event_id').limit(0),
+    database.from('ticketing_events').select('venue_maps_url,service_fee_minor').limit(0),
+    database.from('ticketing_orders').select('promotion_id').limit(0)
   ]);
   const migrationError = migrationChecks.find(check => check.error)?.error;
   if (migrationError) {

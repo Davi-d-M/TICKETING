@@ -2,9 +2,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CalendarDays, Clock3, Ghost, MapPin, ShieldAlert, ShieldCheck, Ticket } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock3, Ghost, MapPin, Navigation, ShieldAlert, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
 import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 import PurchaseForm from '../PurchaseForm';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,7 @@ export default async function TicketEventPage({ params }: PageProps) {
 
   const now = Date.now();
   const salesReady = await isTicketingSalesReady();
+  const mapLinks = getVenueMapLinks(event);
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -left-36 top-24 h-96 w-96 rounded-full bg-orange-500/10 blur-[110px]" />
@@ -88,12 +90,22 @@ export default async function TicketEventPage({ params }: PageProps) {
               <EventDetail icon={MapPin} title="Where" value={`${event.venue_name}${event.venue_address ? ` · ${event.venue_address}` : ''}`} />
               {event.doors_open_at && <EventDetail icon={Clock3} title="Doors open" value={formatEventDate(event.doors_open_at, event.timezone)} />}
               {event.age_limit !== null && <EventDetail icon={ShieldCheck} title="Age requirement" value={`${event.age_limit}+`} />}
+              {event.dress_code && <EventDetail icon={Ghost} title="Dress code" value={event.dress_code} />}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a href="#ticket-options" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-400 px-5 text-xs font-black text-[#170d18] transition hover:bg-orange-300"><Ticket size={15} /> Get tickets</a>
+              {mapLinks && <>
+                <a href={mapLinks.map} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-4 text-xs font-bold text-white hover:bg-white/10"><MapPin size={15} /> View on Google Maps</a>
+                <a href={mapLinks.directions} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-4 text-xs font-bold text-white hover:bg-white/10"><Navigation size={15} /> Get directions</a>
+              </>}
+              <a href="#arrival-guide" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-4 text-xs font-bold text-white hover:bg-white/10"><Navigation size={15} /> Find transport</a>
+              <a href="#arrival-guide" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-4 text-xs font-bold text-white hover:bg-white/10"><MapPin size={15} /> Venue & entry guide</a>
             </div>
           </div>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-          <section className="rounded-3xl border border-white/10 bg-[#17121e] p-5 shadow-xl shadow-black/20 sm:p-7">
+          <section id="ticket-options" className="scroll-mt-5 rounded-3xl border border-white/10 bg-[#17121e] p-5 shadow-xl shadow-black/20 sm:p-7">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300">Choose your haunt</p><h2 className="mt-1 text-2xl font-black">Ticket options</h2></div>
               <span className="text-xs text-slate-500">{event.ticket_types.length} {event.ticket_types.length === 1 ? 'ticket type' : 'ticket types'}</span>
@@ -114,6 +126,7 @@ export default async function TicketEventPage({ params }: PageProps) {
                       </div>
                       <p className="shrink-0 text-lg font-black text-orange-100">{formatPrice(ticketType.price_minor, ticketType.currency)}</p>
                     </div>
+                    {ticketType.benefits.length > 0 && <ul className="mt-3 grid gap-1 text-xs text-slate-300 sm:grid-cols-2">{ticketType.benefits.map(benefit => <li key={benefit} className="flex items-start gap-2"><ShieldCheck size={13} className="mt-0.5 shrink-0 text-violet-200" />{benefit}</li>)}</ul>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
                       <span className="text-[10px] font-semibold text-slate-500">{schedule}</span>
                     </div>
@@ -127,6 +140,7 @@ export default async function TicketEventPage({ params }: PageProps) {
                         ticketTypeId={ticketType.id}
                         name={ticketType.name}
                         price={String(ticketType.price_minor)}
+                        serviceFeeMinor={event.service_fee_minor}
                         currency={ticketType.currency.trim()}
                         min={ticketType.min_per_order}
                         max={Math.min(ticketType.max_per_order, ticketType.remaining, 20)}
@@ -146,6 +160,14 @@ export default async function TicketEventPage({ params }: PageProps) {
           <aside className="space-y-4">
             <section role="status" className="rounded-3xl border border-orange-300/20 bg-gradient-to-br from-orange-950/35 to-[#1b1221] p-5 sm:p-6">
               <div className="flex items-start gap-3"><span className="rounded-xl bg-orange-300/10 p-2 text-orange-200"><ShieldAlert size={18} /></span><div><h2 className="text-sm font-black text-orange-100">{salesReady ? 'Secure Paystack checkout' : 'Purchases are not open'}</h2><p className="mt-2 text-xs leading-5 text-orange-50/70">{salesReady ? 'Payment is verified with Paystack on the server before tickets are issued. A one-time wallet link is sent to your purchase email.' : 'Ticket listings are visible, but checkout stays paused until Paystack, guest email delivery and the server-side security settings are configured.'}</p></div></div>
+            </section>
+            <section id="arrival-guide" className="scroll-mt-5 rounded-3xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
+              <h2 className="text-sm font-black text-white">Venue & arrival guide</h2>
+              <p className="mt-2 text-xs leading-5 text-slate-300">{event.venue_name}{event.venue_address ? ` · ${event.venue_address}` : ''}, {event.city}</p>
+              {event.entrance_instructions ? <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-400"><strong className="text-slate-200">Entry:</strong> {event.entrance_instructions}</p> : <p className="mt-3 text-xs leading-5 text-slate-500">Entrance details have not been published yet.</p>}
+              {event.parking_details ? <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-400"><strong className="text-slate-200">Parking:</strong> {event.parking_details}</p> : <p className="mt-3 text-xs leading-5 text-slate-500">Parking information has not been published yet.</p>}
+              {event.transport_guidance ? <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-400"><strong className="text-slate-200">Transport & arrival:</strong> {event.transport_guidance}</p> : <p className="mt-3 text-xs leading-5 text-slate-500">Transport and arrival guidance has not been published yet. Please check back before travelling.</p>}
+              {mapLinks && <div className="mt-4 flex flex-wrap gap-2"><a href={mapLinks.map} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-bold text-orange-100 hover:bg-white/5"><MapPin size={14} /> View on Google Maps</a><a href={mapLinks.directions} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-bold text-orange-100 hover:bg-white/5"><Navigation size={14} /> Get directions</a></div>}
             </section>
             <section className="rounded-3xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
               <h2 className="text-sm font-black text-white">The real-ticket promise</h2>

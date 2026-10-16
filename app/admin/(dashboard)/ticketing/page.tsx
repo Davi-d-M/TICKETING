@@ -33,11 +33,25 @@ type TicketType = {
   price_minor: number;
   currency: string;
   capacity: number;
+  benefits: string[];
   min_per_order: number;
   max_per_order: number;
   sales_start_at: string | null;
   sales_end_at: string | null;
   status: string;
+};
+
+type TicketPromotion = {
+  id: string;
+  event_id: string;
+  code: string;
+  discount_type: 'fixed' | 'percentage';
+  discount_value: number;
+  currency: string;
+  max_redemptions: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  active: boolean;
 };
 
 type TicketEvent = {
@@ -54,9 +68,18 @@ type TicketEvent = {
   age_limit: number | null;
   capacity: number | null;
   cover_image_url: string | null;
+  venue_maps_url: string;
+  venue_latitude: number | null;
+  venue_longitude: number | null;
+  entrance_instructions: string;
+  parking_details: string;
+  transport_guidance: string;
+  dress_code: string;
+  service_fee_minor: number;
   status: string;
   created_at: string;
   ticket_types: TicketType[];
+  promotions: TicketPromotion[];
 };
 
 type DashboardData = {
@@ -78,6 +101,12 @@ function eventDate(value: string) {
   return Number.isNaN(date.getTime()) ? 'Date to be confirmed' : date.toLocaleString('en-KE', {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
+}
+
+function dateTimeInput(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
 function statusLabel(status: string) {
@@ -108,6 +137,14 @@ function EventForm({ onCreated, onCancel }: { onCreated: (notice?: string) => vo
           venueName: formData.get('venueName'),
           venueAddress: formData.get('venueAddress'),
           city: formData.get('city'),
+          venueMapsUrl: formData.get('venueMapsUrl'),
+          venueLatitude: formData.get('venueLatitude'),
+          venueLongitude: formData.get('venueLongitude'),
+          entranceInstructions: formData.get('entranceInstructions'),
+          parkingDetails: formData.get('parkingDetails'),
+          transportGuidance: formData.get('transportGuidance'),
+          dressCode: formData.get('dressCode'),
+          serviceFee: formData.get('serviceFee'),
           startsAt: formData.get('startsAt'),
           endsAt: formData.get('endsAt'),
           doorsOpenAt: formData.get('doorsOpenAt'),
@@ -153,9 +190,17 @@ function EventForm({ onCreated, onCancel }: { onCreated: (notice?: string) => vo
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className={`${labelClass} sm:col-span-2`}>Event name<input className={inputClass} name="title" required minLength={3} maxLength={160} placeholder="Midnight Society KE" /></label>
-        <label className={labelClass}>Venue<input className={inputClass} name="venueName" required minLength={2} maxLength={180} placeholder="Venue name" /></label>
-        <label className={labelClass}>City<input className={inputClass} name="city" required minLength={2} maxLength={100} defaultValue="Nairobi" /></label>
+        <label className={labelClass}>Venue<input className={inputClass} name="venueName" required minLength={2} maxLength={180} defaultValue="Edgewood Country Place" /></label>
+        <label className={labelClass}>Town / city<input className={inputClass} name="city" required minLength={2} maxLength={100} placeholder="Enter the confirmed town or city" /></label>
         <label className={`${labelClass} sm:col-span-2`}>Venue address<input className={inputClass} name="venueAddress" maxLength={500} placeholder="Street, area, directions" /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Verified Google Maps link (optional)<input className={inputClass} name="venueMapsUrl" type="url" placeholder="https://maps.google.com/..." /><span className="mt-1 block text-[10px] font-normal text-slate-500">Map buttons stay hidden until a verified link, coordinates or full address is provided.</span></label>
+        <label className={labelClass}>Venue latitude (optional)<input className={inputClass} name="venueLatitude" type="number" min="-90" max="90" step="any" placeholder="-1.234567" /></label>
+        <label className={labelClass}>Venue longitude (optional)<input className={inputClass} name="venueLongitude" type="number" min="-180" max="180" step="any" placeholder="36.123456" /></label>
+        <label className={labelClass}>Entrance / entry pin instructions<textarea className={`${inputClass} min-h-20 py-3`} name="entranceInstructions" maxLength={2000} placeholder="Confirmed gate, entrance and arrival instructions" /></label>
+        <label className={labelClass}>Parking information<textarea className={`${inputClass} min-h-20 py-3`} name="parkingDetails" maxLength={2000} placeholder="Confirmed parking arrangements" /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Transport & arrival guidance<textarea className={`${inputClass} min-h-20 py-3`} name="transportGuidance" maxLength={3000} placeholder="Only publish confirmed pickup points and public transport guidance" /></label>
+        <label className={labelClass}>Dress code (optional)<input className={inputClass} name="dressCode" maxLength={500} placeholder="Dress code" /></label>
+        <label className={labelClass}>Service fee per ticket (KES)<input className={inputClass} name="serviceFee" type="number" min="0" max="1000000" step="0.01" defaultValue="0" /></label>
         <label className={labelClass}>Event starts<input className={inputClass} name="startsAt" type="datetime-local" required /></label>
         <label className={labelClass}>Event ends<input className={inputClass} name="endsAt" type="datetime-local" required /></label>
         <label className={labelClass}>Doors open (optional)<input className={inputClass} name="doorsOpenAt" type="datetime-local" /></label>
@@ -194,6 +239,7 @@ function TierForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreate
           description: formData.get('description'),
           price: formData.get('price'),
           capacity: formData.get('capacity'),
+          benefits: String(formData.get('benefits') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
           minPerOrder: formData.get('minPerOrder'),
           maxPerOrder: formData.get('maxPerOrder'),
           salesStartAt: formData.get('salesStartAt'),
@@ -219,6 +265,7 @@ function TierForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreate
         <label className={labelClass}>Price (KES)<input className={inputClass} name="price" required type="number" min="0" max="999999999" step="0.01" placeholder="2500.00" /></label>
         <label className={labelClass}>Allocation<input className={inputClass} name="capacity" required type="number" min="1" max="1000000" placeholder="100" /></label>
         <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Description<input className={inputClass} name="description" maxLength={2000} placeholder="What's included with this tier?" /></label>
+        <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Included benefits (one per line)<textarea className={`${inputClass} min-h-20 py-3`} name="benefits" maxLength={4000} placeholder={'Priority entry\nReserved section\nWelcome drink'} /><span className="mt-1 block text-[10px] font-normal text-slate-500">List only benefits your event team can deliver. Up to 20 lines.</span></label>
         <label className={labelClass}>Minimum per order<input className={inputClass} name="minPerOrder" required type="number" min="1" max="100" defaultValue="1" /></label>
         <label className={labelClass}>Maximum per order<input className={inputClass} name="maxPerOrder" required type="number" min="1" max="100" defaultValue="10" /></label>
         <label className={labelClass}>Sales open<input className={inputClass} name="salesStartAt" type="datetime-local" /></label>
@@ -232,6 +279,182 @@ function TierForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreate
   );
 }
 
+function EventExperienceForm({ event, onSaved, onCancel }: { event: TicketEvent; onSaved: () => void; onCancel: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(formData: FormData) {
+    setSaving(true);
+    setError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_event_experience',
+          eventId: event.id,
+          venueName: formData.get('venueName'),
+          venueAddress: formData.get('venueAddress'),
+          city: formData.get('city'),
+          venueMapsUrl: formData.get('venueMapsUrl'),
+          venueLatitude: formData.get('venueLatitude'),
+          venueLongitude: formData.get('venueLongitude'),
+          entranceInstructions: formData.get('entranceInstructions'),
+          parkingDetails: formData.get('parkingDetails'),
+          transportGuidance: formData.get('transportGuidance'),
+          dressCode: formData.get('dressCode'),
+          serviceFee: formData.get('serviceFee'),
+          eventCapacity: formData.get('eventCapacity')
+        })
+      }));
+      onSaved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Event details could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="mt-4 rounded-xl border border-orange-300/15 bg-[#100d17] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div><h4 className="text-sm font-black text-white">Venue, arrival & pricing</h4><p className="mt-1 text-[10px] text-slate-400">Only confirmed details are shown to guests. Fees are fixed per ticket.</p></div>
+        <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Close</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className={labelClass}>Venue<input className={inputClass} name="venueName" required minLength={2} maxLength={180} defaultValue={event.venue_name} /></label>
+        <label className={labelClass}>Town / city<input className={inputClass} name="city" required minLength={2} maxLength={100} defaultValue={event.city} /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Full address<input className={inputClass} name="venueAddress" maxLength={500} defaultValue={event.venue_address} placeholder="Confirmed street and area" /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Verified Google Maps link<input className={inputClass} name="venueMapsUrl" type="url" defaultValue={event.venue_maps_url} placeholder="https://maps.google.com/..." /></label>
+        <label className={labelClass}>Latitude<input className={inputClass} name="venueLatitude" type="number" min="-90" max="90" step="any" defaultValue={event.venue_latitude ?? ''} /></label>
+        <label className={labelClass}>Longitude<input className={inputClass} name="venueLongitude" type="number" min="-180" max="180" step="any" defaultValue={event.venue_longitude ?? ''} /></label>
+        <label className={labelClass}>Entrance / entry pin<textarea className={`${inputClass} min-h-20 py-3`} name="entranceInstructions" maxLength={2000} defaultValue={event.entrance_instructions} placeholder="Confirmed gate and entrance" /></label>
+        <label className={labelClass}>Parking<textarea className={`${inputClass} min-h-20 py-3`} name="parkingDetails" maxLength={2000} defaultValue={event.parking_details} placeholder="Confirmed parking information" /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Transport & arrival<textarea className={`${inputClass} min-h-20 py-3`} name="transportGuidance" maxLength={3000} defaultValue={event.transport_guidance} placeholder="Confirmed transport and arrival details only" /></label>
+        <label className={labelClass}>Dress code<input className={inputClass} name="dressCode" maxLength={500} defaultValue={event.dress_code} placeholder="Optional" /></label>
+        <label className={labelClass}>Service fee per ticket (KES)<input className={inputClass} name="serviceFee" required type="number" min="0" max="1000000" step="0.01" defaultValue={(event.service_fee_minor / 100).toFixed(2)} /></label>
+        <label className={labelClass}>Total event capacity (optional)<input className={inputClass} name="eventCapacity" type="number" min="1" max="1000000" defaultValue={event.capacity ?? ''} placeholder="No event-wide limit" /><span className="mt-1 block text-[10px] font-normal text-slate-500">Must be at least the sum of ticket-tier allocations.</span></label>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      <button disabled={saving} className="mt-4 min-h-10 rounded-lg bg-orange-400 px-4 text-xs font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">{saving ? 'Saving…' : 'Save event details'}</button>
+    </form>
+  );
+}
+
+function EditTierForm({ event, tier, onSaved, onCancel }: {
+  event: TicketEvent;
+  tier: TicketType;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(formData: FormData) {
+    setSaving(true);
+    setError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_ticket_type',
+          eventId: event.id,
+          ticketTypeId: tier.id,
+          name: formData.get('name'),
+          description: formData.get('description'),
+          price: formData.get('price'),
+          capacity: formData.get('capacity'),
+          benefits: String(formData.get('benefits') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+          minPerOrder: formData.get('minPerOrder'),
+          maxPerOrder: formData.get('maxPerOrder'),
+          salesStartAt: formData.get('salesStartAt'),
+          salesEndAt: formData.get('salesEndAt')
+        })
+      }));
+      onSaved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The ticket tier could not be updated.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="mt-3 rounded-xl border border-orange-300/15 bg-[#100d17] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-black text-white">Edit {tier.name}</h4>
+        <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Cancel</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className={labelClass}>Tier name<input className={inputClass} name="name" required minLength={2} maxLength={100} defaultValue={tier.name} /></label>
+        <label className={labelClass}>Price (KES)<input className={inputClass} name="price" required type="number" min="0.01" max="999999999.99" step="0.01" defaultValue={(tier.price_minor / 100).toFixed(2)} /></label>
+        <label className={labelClass}>Allocation<input className={inputClass} name="capacity" required type="number" min="1" max="1000000" defaultValue={tier.capacity} /></label>
+        <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Description<input className={inputClass} name="description" maxLength={2000} defaultValue={tier.description} /></label>
+        <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Included benefits (one per line)<textarea className={`${inputClass} min-h-20 py-3`} name="benefits" maxLength={4000} defaultValue={tier.benefits.join('\n')} /></label>
+        <label className={labelClass}>Minimum per order<input className={inputClass} name="minPerOrder" required type="number" min="1" max="100" defaultValue={tier.min_per_order} /></label>
+        <label className={labelClass}>Maximum per order<input className={inputClass} name="maxPerOrder" required type="number" min="1" max="100" defaultValue={tier.max_per_order} /></label>
+        <label className={labelClass}>Sales open<input className={inputClass} name="salesStartAt" type="datetime-local" defaultValue={dateTimeInput(tier.sales_start_at)} /></label>
+        <label className={labelClass}>Sales close<input className={inputClass} name="salesEndAt" type="datetime-local" defaultValue={dateTimeInput(tier.sales_end_at)} /></label>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      <button disabled={saving} className="mt-4 min-h-10 rounded-lg bg-orange-400 px-4 text-sm font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">{saving ? 'Saving changes…' : 'Save tier changes'}</button>
+      <p className="mt-2 text-[10px] text-slate-500">Tier terms lock as soon as an order exists or ticket sales open.</p>
+    </form>
+  );
+}
+
+function PromotionForm({ eventId, onSaved, onCancel }: { eventId: string; onSaved: () => void; onCancel: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('percentage');
+
+  async function submit(formData: FormData) {
+    setSaving(true);
+    setError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_promotion',
+          eventId,
+          code: formData.get('code'),
+          discountType,
+          discountValue: formData.get('discountValue'),
+          maxRedemptions: formData.get('maxRedemptions'),
+          startsAt: formData.get('startsAt'),
+          endsAt: formData.get('endsAt')
+        })
+      }));
+      onSaved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The discount could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="mt-4 rounded-xl border border-violet-300/15 bg-[#100d17] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div><h4 className="text-sm font-black text-white">Create discount code</h4><p className="mt-1 text-[10px] text-slate-400">Discount applies to ticket subtotal. The per-ticket service fee is not discounted.</p></div>
+        <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Close</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className={labelClass}>Code<input className={inputClass} name="code" required minLength={2} maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,39}" autoCapitalize="characters" placeholder="EARLYBIRD" /></label>
+        <label className={labelClass}>Discount type<select className={inputClass} value={discountType} onChange={change => setDiscountType(change.target.value as 'fixed' | 'percentage')}><option value="percentage">Percentage</option><option value="fixed">Fixed KSh amount</option></select></label>
+        <label className={labelClass}>{discountType === 'percentage' ? 'Percent off (1–100)' : 'KSh off per order'}<input className={inputClass} name="discountValue" required type="number" min={discountType === 'percentage' ? 1 : 0.01} max={discountType === 'percentage' ? 100 : 9999999} step={discountType === 'percentage' ? 1 : 0.01} placeholder={discountType === 'percentage' ? '10' : '500.00'} /></label>
+        <label className={labelClass}>Maximum redemptions (optional)<input className={inputClass} name="maxRedemptions" type="number" min="1" max="1000000" placeholder="Unlimited" /></label>
+        <label className={labelClass}>Code starts (optional)<input className={inputClass} name="startsAt" type="datetime-local" /></label>
+        <label className={labelClass}>Code ends (optional)<input className={inputClass} name="endsAt" type="datetime-local" /></label>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      <button disabled={saving} className="mt-4 min-h-10 rounded-lg bg-violet-300 px-4 text-xs font-black text-[#170d18] hover:bg-violet-200 disabled:opacity-50">{saving ? 'Saving code…' : 'Create discount code'}</button>
+    </form>
+  );
+}
+
 function EventCard({ event, onRefresh, salesReady, canPublish }: {
   event: TicketEvent;
   onRefresh: () => void;
@@ -239,10 +462,14 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
   canPublish: boolean;
 }) {
   const [addingTier, setAddingTier] = useState(false);
+  const [editingTierId, setEditingTierId] = useState<string | null>(null);
+  const [editingExperience, setEditingExperience] = useState(false);
+  const [addingPromotion, setAddingPromotion] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState('');
   const [photoSaving, setPhotoSaving] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [promotionError, setPromotionError] = useState('');
   const allocated = event.ticket_types.reduce((total, tier) => total + tier.capacity, 0);
   async function setStatus(status: 'scheduled' | 'on_sale') {
     setStatusSaving(true);
@@ -277,6 +504,19 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
       setPhotoError(cause instanceof Error ? cause.message : 'Event photo could not be uploaded.');
     } finally {
       setPhotoSaving(false);
+    }
+  }
+  async function setPromotionActive(promotion: TicketPromotion) {
+    setPromotionError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_promotion_active', promotionId: promotion.id, active: !promotion.active })
+      }));
+      onRefresh();
+    } catch (cause) {
+      setPromotionError(cause instanceof Error ? cause.message : 'Discount status could not be updated.');
     }
   }
   return (
@@ -318,6 +558,27 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
           <div className="rounded-xl border border-white/5 bg-white/[0.035] p-3"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Tier allocation</p><p className="mt-1 text-sm font-black text-white">{allocated.toLocaleString('en-KE')}{event.capacity ? ` / ${event.capacity.toLocaleString('en-KE')}` : ''}</p></div>
           <div className="rounded-xl border border-white/5 bg-white/[0.035] p-3"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Event ends</p><p className="mt-1 text-sm font-black text-white">{eventDate(event.ends_at)}</p></div>
         </div>
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-3">
+          <p className="mr-auto text-xs text-slate-300">Service fee: <strong className="text-white">{money(event.service_fee_minor)} per ticket</strong></p>
+          {['draft', 'scheduled'].includes(event.status) && <button type="button" onClick={() => { setEditingExperience(value => !value); setAddingPromotion(false); }} className="min-h-9 rounded-lg border border-white/10 px-3 text-xs font-bold text-orange-100 hover:bg-white/5">{editingExperience ? 'Close event details' : 'Edit venue, arrival & fee'}</button>}
+          {['draft', 'scheduled'].includes(event.status) && <button type="button" onClick={() => { setAddingPromotion(value => !value); setEditingExperience(false); }} className="min-h-9 rounded-lg border border-violet-200/20 px-3 text-xs font-bold text-violet-100 hover:bg-violet-100/5">{addingPromotion ? 'Close discount form' : `Discounts (${event.promotions.length})`}</button>}
+        </div>
+        {editingExperience && <EventExperienceForm event={event} onCancel={() => setEditingExperience(false)} onSaved={() => { setEditingExperience(false); onRefresh(); }} />}
+        {addingPromotion && <PromotionForm eventId={event.id} onCancel={() => setAddingPromotion(false)} onSaved={() => { setAddingPromotion(false); onRefresh(); }} />}
+        {event.promotions.length > 0 && (
+          <div className="mb-5 rounded-xl border border-violet-200/10 bg-black/10 p-4">
+            <h4 className="text-xs font-black uppercase tracking-wide text-violet-100">Discount codes</h4>
+            <div className="mt-3 space-y-2">
+              {event.promotions.map(promotion => (
+                <div key={promotion.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.025] p-3">
+                  <div><p className="text-sm font-black text-white">{promotion.code} <span className={`ml-2 text-[9px] uppercase ${promotion.active ? 'text-emerald-200' : 'text-slate-500'}`}>{promotion.active ? 'Active' : 'Paused'}</span></p><p className="mt-1 text-[10px] text-slate-400">{promotion.discount_type === 'percentage' ? `${promotion.discount_value}% off` : `${money(promotion.discount_value)} off`} · {promotion.max_redemptions ? `${promotion.max_redemptions} redemptions max` : 'No redemption cap'}</p></div>
+                  <button type="button" onClick={() => void setPromotionActive(promotion)} className="min-h-8 rounded-md border border-white/10 px-2.5 text-[10px] font-bold text-slate-200 hover:bg-white/5">{promotion.active ? 'Pause code' : 'Reactivate'}</button>
+                </div>
+              ))}
+            </div>
+            {promotionError && <p role="alert" className="mt-2 text-xs text-red-200">{promotionError}</p>}
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-black text-white">Ticket tiers</h4>
@@ -337,12 +598,18 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
         {event.ticket_types.length > 0 ? (
           <div className="mt-4 divide-y divide-white/10 rounded-xl border border-white/10">
             {event.ticket_types.map(tier => (
-              <div key={tier.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="mt-0.5 rounded-lg bg-orange-400/10 p-2 text-orange-300"><Ticket size={15} /></span>
-                  <div className="min-w-0"><p className="truncate text-sm font-black text-white">{tier.name}</p><p className="mt-1 text-xs text-slate-400">{tier.description || 'No tier description'} · {tier.min_per_order}–{tier.max_per_order} per order</p></div>
+              <div key={tier.id}>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 rounded-lg bg-orange-400/10 p-2 text-orange-300"><Ticket size={15} /></span>
+                    <div className="min-w-0"><p className="truncate text-sm font-black text-white">{tier.name}</p><p className="mt-1 text-xs text-slate-400">{tier.description || 'No tier description'} · {tier.min_per_order}–{tier.max_per_order} per order</p>{tier.benefits.length > 0 && <p className="mt-1 text-[10px] text-violet-200">{tier.benefits.join(' · ')}</p>}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right"><p className="text-sm font-black text-orange-100">{money(tier.price_minor, tier.currency)}</p><p className="mt-1 text-xs text-slate-400">{tier.capacity.toLocaleString('en-KE')} allocated · {statusLabel(tier.status)}</p></div>
+                    {['draft', 'scheduled'].includes(event.status) && tier.status !== 'archived' && <button type="button" onClick={() => setEditingTierId(value => value === tier.id ? null : tier.id)} className="min-h-9 rounded-lg border border-white/10 px-3 text-xs font-bold text-orange-100 hover:bg-white/5">{editingTierId === tier.id ? 'Close' : 'Edit'}</button>}
+                  </div>
                 </div>
-                <div className="text-right"><p className="text-sm font-black text-orange-100">{money(tier.price_minor, tier.currency)}</p><p className="mt-1 text-xs text-slate-400">{tier.capacity.toLocaleString('en-KE')} allocated · {statusLabel(tier.status)}</p></div>
+                {editingTierId === tier.id && <div className="px-4 pb-4"><EditTierForm event={event} tier={tier} onCancel={() => setEditingTierId(null)} onSaved={() => { setEditingTierId(null); onRefresh(); }} /></div>}
               </div>
             ))}
           </div>

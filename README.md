@@ -34,13 +34,16 @@ After reviewing the SQL and confirming the target Supabase project, apply in thi
 
 1. `supabase/TICKETING_CORE_MIGRATION.sql`
 2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
-3. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
-4. `supabase/TICKETING_SECURITY_MIGRATION.sql`
-5. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
-6. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
+3. `supabase/TICKETING_PREMIUM_EXPERIENCE_MIGRATION.sql`
+4. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
+5. `supabase/TICKETING_SECURITY_MIGRATION.sql`
+6. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
+7. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 
 The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
 Admins can upload or replace JPEG, PNG and WebP event photos (up to 4 MB) from the event form or event card. The bucket is public-read-only; uploads require the admin session and server-side Supabase service role. Apply the event-images migration before uploading.
+
+The premium-experience migration adds venue maps and arrival guidance, per-ticket fees, configurable tier benefits, and server-validated promotion codes. It also adds transactional admin updates for event capacity and ticket tiers. Sales cannot open until a Google Maps link, coordinates, or a complete venue address and city have been supplied. Only publish confirmed transport, parking and entrance information.
 
 The Live Operations view reads committed operational changes from an append-only, allowlisted database journal. It polls the protected API every five seconds and recovers using an event cursor; it is not a push/WebSocket connection or an external security log. It deliberately omits buyer contact details, payment payloads and ticket credential hashes.
 
@@ -59,4 +62,4 @@ The site shell and browse-only pages work without environment variables; databas
 
 ## Sales stay disabled until release approval
 
-Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and online assigned gate-staff scanning are implemented. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all six migrations, configure payment/email/session/encryption secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission, rotating QR codes and a native Android wallet are not implemented.
+Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and online assigned gate-staff scanning are implemented. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all seven migrations, configure payment/email/session/encryption secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission, rotating QR codes and a native Android wallet are not implemented.

@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server';
 import { getAdminSession, isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
 import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import { isTrustedVenueMapUrl } from '@/lib/ticketing/venueLinks';
 
 export const dynamic = 'force-dynamic';
 
-const eventFields = 'id,organizer_id,title,slug,description,venue_name,venue_address,city,timezone,starts_at,ends_at,doors_open_at,age_limit,capacity,status,cancellation_policy,cover_image_url,published_at,created_at,updated_at';
+const eventFields = 'id,organizer_id,title,slug,description,venue_name,venue_address,city,timezone,starts_at,ends_at,doors_open_at,age_limit,capacity,status,cancellation_policy,cover_image_url,venue_maps_url,venue_latitude,venue_longitude,entrance_instructions,parking_details,transport_guidance,dress_code,service_fee_minor,published_at,created_at,updated_at';
 const ticketTypeFields = 'id,event_id,name,description,price_minor,currency,capacity,min_per_order,max_per_order,sales_start_at,sales_end_at,benefits,status,created_at,updated_at';
+const promotionFields = 'id,event_id,code,discount_type,discount_value,currency,max_redemptions,starts_at,ends_at,active';
 
 async function authorize() {
   const session = await getAdminSession();
@@ -85,8 +87,23 @@ export async function GET() {
   for (const type of ticketTypesResult.data || []) {
     typesByEvent.set(type.event_id, [...(typesByEvent.get(type.event_id) || []), type]);
   }
+  const promotionsResult = eventIds.length
+    ? await database.from('ticketing_promotions').select(promotionFields).in('event_id', eventIds).order('created_at', { ascending: false })
+    : { data: [], error: null };
+  if (promotionsResult.error) {
+    console.error('[TicketingAdmin] Could not load event promotions:', promotionsResult.error);
+    return NextResponse.json({ error: 'Event discounts could not be loaded.' }, { status: 503 });
+  }
+  const promotionsByEvent = new Map<string, typeof promotionsResult.data>();
+  for (const promotion of promotionsResult.data || []) {
+    promotionsByEvent.set(promotion.event_id, [...(promotionsByEvent.get(promotion.event_id) || []), promotion]);
+  }
   return NextResponse.json({
-    events: events.map(event => ({ ...event, ticket_types: typesByEvent.get(event.id) || [] })),
+    events: events.map(event => ({
+      ...event,
+      ticket_types: typesByEvent.get(event.id) || [],
+      promotions: promotionsByEvent.get(event.id) || []
+    })),
     totals: {
       events: eventCount.count || 0,
       tickets: ticketCount.count || 0,
@@ -141,6 +158,165 @@ export async function POST(request: Request) {
     return NextResponse.json({ event: data });
   }
 
+  if (body.action === 'update_event_experience') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const venueName = typeof body.venueName === 'string' ? body.venueName.trim() : '';
+    const venueAddress = typeof body.venueAddress === 'string' ? body.venueAddress.trim() : '';
+    const city = typeof body.city === 'string' ? body.city.trim() : '';
+    const mapsUrl = typeof body.venueMapsUrl === 'string' ? body.venueMapsUrl.trim() : '';
+    const latitude = body.venueLatitude === '' || body.venueLatitude === null || body.venueLatitude === undefined
+      ? null : Number(body.venueLatitude);
+    const longitude = body.venueLongitude === '' || body.venueLongitude === null || body.venueLongitude === undefined
+      ? null : Number(body.venueLongitude);
+    const entranceInstructions = typeof body.entranceInstructions === 'string' ? body.entranceInstructions.trim() : '';
+    const parkingDetails = typeof body.parkingDetails === 'string' ? body.parkingDetails.trim() : '';
+    const transportGuidance = typeof body.transportGuidance === 'string' ? body.transportGuidance.trim() : '';
+    const dressCode = typeof body.dressCode === 'string' ? body.dressCode.trim() : '';
+    const serviceFeeMinor = parseMoney(body.serviceFee);
+    const eventCapacity = body.eventCapacity === '' || body.eventCapacity === null || body.eventCapacity === undefined
+      ? null : Number(body.eventCapacity);
+
+    let validMapsUrl = false;
+    if (mapsUrl) {
+      validMapsUrl = isTrustedVenueMapUrl(mapsUrl);
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)
+      || venueName.length < 2 || venueName.length > 180 || venueAddress.length > 500
+      || city.length < 2 || city.length > 100 || (mapsUrl && (!validMapsUrl || mapsUrl.length > 1000))
+      || (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90))
+      || (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))
+      || ((latitude === null) !== (longitude === null))
+      || entranceInstructions.length > 2000 || parkingDetails.length > 2000
+      || transportGuidance.length > 3000 || dressCode.length > 500
+      || serviceFeeMinor === null || serviceFeeMinor > 100_000_000
+      || (eventCapacity !== null && (!Number.isSafeInteger(eventCapacity) || eventCapacity < 1 || eventCapacity > 1_000_000))) {
+      return NextResponse.json({ error: 'Check the venue, map, arrival details and non-negative per-ticket service fee.' }, { status: 400 });
+    }
+
+    const { data: updated, error: updateError } = await database.rpc('ticketing_update_event_experience', {
+      p_event_id: eventId,
+      p_venue_name: venueName,
+      p_venue_address: venueAddress,
+      p_city: city,
+      p_venue_maps_url: mapsUrl,
+      p_venue_latitude: latitude,
+      p_venue_longitude: longitude,
+      p_entrance_instructions: entranceInstructions,
+      p_parking_details: parkingDetails,
+      p_transport_guidance: transportGuidance,
+      p_dress_code: dressCode,
+      p_service_fee_minor: serviceFeeMinor,
+      p_capacity: eventCapacity,
+      p_actor_email: session?.email || ''
+    });
+    if (updateError || !updated) {
+      if (updateError?.code === 'P0001') return NextResponse.json({ error: updateError.message }, { status: 409 });
+      if (updateError?.code === 'P0002') return NextResponse.json({ error: 'The selected event was not found.' }, { status: 404 });
+      if (updateError?.code === '22023') return NextResponse.json({ error: 'The event details are invalid.' }, { status: 400 });
+      console.error('[TicketingAdmin] Could not update event experience:', updateError);
+      return NextResponse.json({ error: 'Venue and pricing details could not be saved.' }, { status: 503 });
+    }
+    return NextResponse.json({ event: updated });
+  }
+
+  if (body.action === 'create_promotion') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+    const discountType = body.discountType === 'percentage' || body.discountType === 'fixed'
+      ? body.discountType : '';
+    const rawValue = discountType === 'fixed' ? parseMoney(body.discountValue) : Number(body.discountValue);
+    const maxRedemptions = body.maxRedemptions === '' || body.maxRedemptions === null || body.maxRedemptions === undefined
+      ? null : Number(body.maxRedemptions);
+    const startsAt = body.startsAt ? parseDate(body.startsAt) : null;
+    const endsAt = body.endsAt ? parseDate(body.endsAt) : null;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)
+      || !/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(code)
+      || !discountType || rawValue === null || !Number.isSafeInteger(rawValue) || rawValue <= 0
+      || (discountType === 'percentage' && rawValue > 100)
+      || (maxRedemptions !== null && (!Number.isSafeInteger(maxRedemptions) || maxRedemptions < 1 || maxRedemptions > 1_000_000))
+      || (body.startsAt && !startsAt) || (body.endsAt && !endsAt)
+      || (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt))) {
+      return NextResponse.json({ error: 'Enter a valid discount code, amount, redemption limit and sale window.' }, { status: 400 });
+    }
+    const { data: event, error: eventError } = await database.from('ticketing_events')
+      .select('status')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (eventError || !event) {
+      if (eventError) console.error('[TicketingAdmin] Could not verify event for promotion:', eventError);
+      return NextResponse.json({ error: 'The event could not be verified for a discount.' }, { status: event ? 503 : 404 });
+    }
+    if (typeof event.status !== 'string' || !['draft', 'scheduled'].includes(event.status)) {
+      return NextResponse.json({ error: 'Discounts can only be added before ticket sales open.' }, { status: 409 });
+    }
+    const { data: promotion, error: promotionError } = await database.from('ticketing_promotions').insert({
+      event_id: eventId,
+      code,
+      discount_type: discountType,
+      discount_value: rawValue,
+      currency: 'KES',
+      max_redemptions: maxRedemptions,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      active: true
+    }).select(promotionFields).single();
+    if (promotionError || !promotion) {
+      if (promotionError?.code === '23505') return NextResponse.json({ error: 'That discount code already exists for this event.' }, { status: 409 });
+      console.error('[TicketingAdmin] Could not create promotion:', promotionError);
+      return NextResponse.json({ error: 'The discount could not be created.' }, { status: 503 });
+    }
+    const { error: auditError } = await database.from('ticketing_audit_logs').insert({
+      actor_email: session?.email || '',
+      action: 'promotion.created',
+      entity_type: 'promotion',
+      entity_id: promotion.id,
+      after_state: promotion
+    });
+    if (auditError) {
+      console.error('[TicketingAdmin] Promotion created but audit record failed:', auditError);
+      return NextResponse.json({ error: 'Discount was created, but the audit record could not be written. Contact support before continuing.' }, { status: 503 });
+    }
+    return NextResponse.json({ promotion }, { status: 201 });
+  }
+
+  if (body.action === 'set_promotion_active') {
+    const promotionId = typeof body.promotionId === 'string' ? body.promotionId : '';
+    const active = body.active === true;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(promotionId)) {
+      return NextResponse.json({ error: 'Choose a valid discount to update.' }, { status: 400 });
+    }
+    const { data: before, error: beforeError } = await database.from('ticketing_promotions')
+      .select(promotionFields)
+      .eq('id', promotionId)
+      .maybeSingle();
+    if (beforeError || !before) {
+      if (beforeError) console.error('[TicketingAdmin] Could not load discount:', beforeError);
+      return NextResponse.json({ error: 'The discount could not be loaded.' }, { status: before ? 503 : 404 });
+    }
+    const { data: promotion, error: updateError } = await database.from('ticketing_promotions')
+      .update({ active })
+      .eq('id', promotionId)
+      .select(promotionFields)
+      .maybeSingle();
+    if (updateError || !promotion) {
+      console.error('[TicketingAdmin] Could not update discount:', updateError);
+      return NextResponse.json({ error: 'The discount could not be updated.' }, { status: 503 });
+    }
+    const { error: auditError } = await database.from('ticketing_audit_logs').insert({
+      actor_email: session?.email || '',
+      action: 'promotion.status_changed',
+      entity_type: 'promotion',
+      entity_id: promotionId,
+      before_state: { active: before.active },
+      after_state: { active: promotion.active }
+    });
+    if (auditError) {
+      console.error('[TicketingAdmin] Discount status saved but audit record failed:', auditError);
+      return NextResponse.json({ error: 'Discount status was saved, but the audit record could not be written. Contact support before continuing.' }, { status: 503 });
+    }
+    return NextResponse.json({ promotion });
+  }
+
   if (body.action === 'create_event') {
     const title = typeof body.title === 'string' ? body.title.trim() : '';
     const venueName = typeof body.venueName === 'string' ? body.venueName.trim() : '';
@@ -155,13 +331,34 @@ export async function POST(request: Request) {
     const description = typeof body.description === 'string' ? body.description.trim() : '';
     const venueAddress = typeof body.venueAddress === 'string' ? body.venueAddress.trim() : '';
     const cancellationPolicy = typeof body.cancellationPolicy === 'string' ? body.cancellationPolicy.trim() : '';
+    const venueMapsUrl = typeof body.venueMapsUrl === 'string' ? body.venueMapsUrl.trim() : '';
+    const venueLatitude = body.venueLatitude === '' || body.venueLatitude === null || body.venueLatitude === undefined
+      ? null : Number(body.venueLatitude);
+    const venueLongitude = body.venueLongitude === '' || body.venueLongitude === null || body.venueLongitude === undefined
+      ? null : Number(body.venueLongitude);
+    const entranceInstructions = typeof body.entranceInstructions === 'string' ? body.entranceInstructions.trim() : '';
+    const parkingDetails = typeof body.parkingDetails === 'string' ? body.parkingDetails.trim() : '';
+    const transportGuidance = typeof body.transportGuidance === 'string' ? body.transportGuidance.trim() : '';
+    const dressCode = typeof body.dressCode === 'string' ? body.dressCode.trim() : '';
+    const serviceFeeMinor = parseMoney(body.serviceFee);
+    let validMapsUrl = false;
+    if (venueMapsUrl) {
+      validMapsUrl = isTrustedVenueMapUrl(venueMapsUrl);
+    }
 
     if (title.length < 3 || title.length > 160 || venueName.length < 2 || venueName.length > 180
       || city.length < 2 || city.length > 100 || !startsAt || !endsAt || new Date(endsAt) <= new Date(startsAt)
       || (body.doorsOpenAt && (!doorsOpenAt || new Date(doorsOpenAt) > new Date(startsAt)))
       || (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000))
       || (ageLimit !== null && (!Number.isSafeInteger(ageLimit) || ageLimit < 0 || ageLimit > 120))
-      || description.length > 10_000 || venueAddress.length > 500 || cancellationPolicy.length > 5_000) {
+      || description.length > 10_000 || venueAddress.length > 500 || cancellationPolicy.length > 5_000
+      || (venueMapsUrl && (!validMapsUrl || venueMapsUrl.length > 1000))
+      || (venueLatitude !== null && (!Number.isFinite(venueLatitude) || venueLatitude < -90 || venueLatitude > 90))
+      || (venueLongitude !== null && (!Number.isFinite(venueLongitude) || venueLongitude < -180 || venueLongitude > 180))
+      || ((venueLatitude === null) !== (venueLongitude === null))
+      || entranceInstructions.length > 2000 || parkingDetails.length > 2000
+      || transportGuidance.length > 3000 || dressCode.length > 500
+      || serviceFeeMinor === null || serviceFeeMinor > 100_000_000) {
       return NextResponse.json({ error: 'Enter a valid event title, venue, city and date range. End time must be after start time.' }, { status: 400 });
     }
 
@@ -192,7 +389,47 @@ export async function POST(request: Request) {
       console.error('[TicketingAdmin] Could not create draft event:', error);
       return NextResponse.json({ error: 'The draft event could not be saved.' }, { status: 503 });
     }
-    return NextResponse.json({ event: { ...(data as Record<string, unknown>), ticket_types: [] } }, { status: 201 });
+    const createdEvent = data as Record<string, unknown>;
+    const eventId = typeof createdEvent.id === 'string' ? createdEvent.id : '';
+    const { data: experience, error: experienceError } = await database.from('ticketing_events')
+      .update({
+        venue_maps_url: venueMapsUrl,
+        venue_latitude: venueLatitude,
+        venue_longitude: venueLongitude,
+        entrance_instructions: entranceInstructions,
+        parking_details: parkingDetails,
+        transport_guidance: transportGuidance,
+        dress_code: dressCode,
+        service_fee_minor: serviceFeeMinor
+      })
+      .eq('id', eventId)
+      .select(eventFields)
+      .single();
+    if (experienceError || !experience) {
+      console.error('[TicketingAdmin] Event draft created but experience details could not be saved:', experienceError);
+      return NextResponse.json({ error: 'Event draft was created, but its venue and price details were not saved. Reopen the event and retry.' }, { status: 503 });
+    }
+    const { error: auditError } = await database.from('ticketing_audit_logs').insert({
+      actor_email: session?.email || '',
+      action: 'event.experience_added',
+      entity_type: 'event',
+      entity_id: eventId,
+      after_state: {
+        venue_maps_url: venueMapsUrl,
+        venue_latitude: venueLatitude,
+        venue_longitude: venueLongitude,
+        entrance_instructions: entranceInstructions,
+        parking_details: parkingDetails,
+        transport_guidance: transportGuidance,
+        dress_code: dressCode,
+        service_fee_minor: serviceFeeMinor
+      }
+    });
+    if (auditError) {
+      console.error('[TicketingAdmin] Event created but experience audit record failed:', auditError);
+      return NextResponse.json({ error: 'The event was created, but its venue audit record could not be written. Contact support before continuing.' }, { status: 503 });
+    }
+    return NextResponse.json({ event: { ...experience, ticket_types: [], promotions: [] } }, { status: 201 });
   }
 
   if (body.action === 'create_ticket_type') {
@@ -205,8 +442,13 @@ export async function POST(request: Request) {
     const maxPerOrder = Number(body.maxPerOrder ?? 10);
     const salesStartAt = body.salesStartAt ? parseDate(body.salesStartAt) : null;
     const salesEndAt = body.salesEndAt ? parseDate(body.salesEndAt) : null;
+    const rawBenefits = body.benefits === undefined ? [] : body.benefits;
+    const benefits = Array.isArray(rawBenefits) && rawBenefits.every((value): value is string => typeof value === 'string')
+      ? rawBenefits.map(value => value.trim()).filter(Boolean)
+      : null;
     if (!/^[0-9a-f-]{36}$/i.test(eventId) || name.length < 2 || name.length > 100
-      || description.length > 2_000 || priceMinor === null
+      || description.length > 2_000 || priceMinor === null || !benefits || benefits.length > 20
+      || benefits.some(value => value.length > 200)
       || !Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000
       || !Number.isSafeInteger(minPerOrder) || !Number.isSafeInteger(maxPerOrder)
       || minPerOrder < 1 || maxPerOrder < minPerOrder || maxPerOrder > 100
@@ -215,7 +457,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Enter a valid tier name, price, capacity, order limit and sale window.' }, { status: 400 });
     }
 
-    const { data, error } = await database.rpc('ticketing_create_ticket_type', {
+    const { data, error } = await database.rpc('ticketing_create_ticket_type_with_benefits', {
       p_event_id: eventId,
       p_name: name,
       p_description: description,
@@ -225,6 +467,7 @@ export async function POST(request: Request) {
       p_max_per_order: maxPerOrder,
       p_sales_start_at: salesStartAt,
       p_sales_end_at: salesEndAt,
+      p_benefits: benefits,
       p_actor_email: session?.email || ''
     });
     if (error || !data) {
@@ -240,7 +483,59 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ error: 'The ticket tier could not be saved.' }, { status: 503 });
     }
-    return NextResponse.json({ ticketType: data as Record<string, unknown> }, { status: 201 });
+    return NextResponse.json({ ticketType: data }, { status: 201 });
+  }
+
+  if (body.action === 'update_ticket_type') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const ticketTypeId = typeof body.ticketTypeId === 'string' ? body.ticketTypeId : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+    const priceMinor = parseMoney(body.price);
+    const capacity = Number(body.capacity);
+    const minPerOrder = Number(body.minPerOrder ?? 1);
+    const maxPerOrder = Number(body.maxPerOrder ?? 10);
+    const salesStartAt = body.salesStartAt ? parseDate(body.salesStartAt) : null;
+    const salesEndAt = body.salesEndAt ? parseDate(body.salesEndAt) : null;
+    const rawBenefits = body.benefits === undefined ? [] : body.benefits;
+    const benefits = Array.isArray(rawBenefits) && rawBenefits.every((value): value is string => typeof value === 'string')
+      ? rawBenefits.map(value => value.trim()).filter(Boolean)
+      : null;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ticketTypeId)
+      || name.length < 2 || name.length > 100 || description.length > 2_000
+      || priceMinor === null || priceMinor < 1 || !benefits || benefits.length > 20
+      || benefits.some(value => value.length > 200)
+      || !Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000
+      || !Number.isSafeInteger(minPerOrder) || !Number.isSafeInteger(maxPerOrder)
+      || minPerOrder < 1 || maxPerOrder < minPerOrder || maxPerOrder > 100
+      || (body.salesStartAt && !salesStartAt) || (body.salesEndAt && !salesEndAt)
+      || (salesStartAt && salesEndAt && new Date(salesEndAt) <= new Date(salesStartAt))) {
+      return NextResponse.json({ error: 'Enter a valid tier name, price, allocation, order limit and sale window.' }, { status: 400 });
+    }
+
+    const { data: updatedType, error: updateError } = await database.rpc('ticketing_update_ticket_type', {
+      p_event_id: eventId,
+      p_ticket_type_id: ticketTypeId,
+      p_name: name,
+      p_description: description,
+      p_price_minor: priceMinor,
+      p_capacity: capacity,
+      p_min_per_order: minPerOrder,
+      p_max_per_order: maxPerOrder,
+      p_sales_start_at: salesStartAt,
+      p_sales_end_at: salesEndAt,
+      p_benefits: benefits,
+      p_actor_email: session?.email || ''
+    });
+    if (updateError || !updatedType) {
+      if (updateError?.code === 'P0001') return NextResponse.json({ error: updateError.message }, { status: 409 });
+      if (updateError?.code === 'P0002') return NextResponse.json({ error: 'The selected event or ticket tier was not found.' }, { status: 404 });
+      if (updateError?.code === '22023') return NextResponse.json({ error: 'The ticket tier details are invalid.' }, { status: 400 });
+      console.error('[TicketingAdmin] Could not update ticket tier:', updateError);
+      return NextResponse.json({ error: 'The ticket tier could not be updated.' }, { status: 503 });
+    }
+    return NextResponse.json({ ticketType: updatedType });
   }
 
   return NextResponse.json({ error: 'Choose a supported ticketing action.' }, { status: 400 });

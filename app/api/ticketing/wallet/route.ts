@@ -50,7 +50,7 @@ export async function GET() {
 
   const { data: event, error: eventError } = await database
     .from('ticketing_events')
-    .select('title,starts_at,ends_at,venue_name,venue_address,city,timezone,age_limit')
+    .select('title,starts_at,ends_at,venue_name,venue_address,city,timezone,age_limit,cover_image_url,venue_maps_url,venue_latitude,venue_longitude,entrance_instructions,parking_details,transport_guidance,dress_code')
     .eq('id', order.event_id)
     .maybeSingle();
   if (eventError || !event) {

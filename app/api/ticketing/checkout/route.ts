@@ -29,11 +29,13 @@ export async function POST(request: Request) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '';
+  const promotionCode = typeof body.promotionCode === 'string' ? body.promotionCode.trim().toUpperCase() : '';
   if (!uuidPattern.test(eventId) || !uuidPattern.test(ticketTypeId)
     || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20
     || name.length < 1 || name.length > 160
     || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    || !uuidPattern.test(idempotencyKey)) {
+    || !uuidPattern.test(idempotencyKey)
+    || promotionCode.length > 40 || (promotionCode && !/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(promotionCode))) {
     return NextResponse.json({ error: 'Enter a valid name, email, ticket quantity and ticket option.' }, { status: 400 });
   }
 
@@ -48,7 +50,8 @@ export async function POST(request: Request) {
     p_buyer_email: email,
     p_buyer_name: name,
     p_idempotency_key: idempotencyKey,
-    p_paystack_reference: paymentReference
+    p_paystack_reference: paymentReference,
+    p_promotion_code: promotionCode || null
   });
   if (error || !data) {
     if (error?.code === 'P0001') {

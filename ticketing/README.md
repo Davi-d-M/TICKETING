@@ -4,7 +4,7 @@ The standalone Ticketing application is managed at `/admin/ticketing` and serves
 
 ## Implemented flows
 
-- Owner/admin event and tier management; only the platform owner can open sales. Opening sales requires future event dates, an active paid tier, explicit server-side release approvals and the commerce migration.
+- Owner/admin event and tier management, including venue arrival guidance, per-ticket fees, ticket benefits, capacity, sale windows and promotion codes. Tier terms lock once an order exists; venue/service-fee changes lock after sales open, and the service fee also locks once any order is recorded. Only the platform owner can open sales. Opening sales requires future event dates, an active paid tier, a verified map destination and explicit server-side release approvals.
 - Paystack KES checkout with a 15-minute inventory reservation, idempotent order/payment records, signed webhook validation, independent server-side payment verification, and exact amount/currency/buyer-email matching.
 - Tickets are issued only after verified payment. Credentials are hashed for validation and encrypted at rest for private guest-wallet display.
 - Buyers retrieve their wallet through an emailed, single-use, 30-minute access link and an HttpOnly, 30-day session cookie. A rate-limited resend form is available if delivery fails.
@@ -21,14 +21,19 @@ Review all SQL files and confirm the target Supabase project before applying the
 
 1. `supabase/TICKETING_CORE_MIGRATION.sql`
 2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
-3. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
-4. `supabase/TICKETING_SECURITY_MIGRATION.sql`
-5. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
-6. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
+3. `supabase/TICKETING_PREMIUM_EXPERIENCE_MIGRATION.sql`
+4. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
+5. `supabase/TICKETING_SECURITY_MIGRATION.sql`
+6. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
+7. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 
 The event-images migration creates a public-read-only bucket for JPEG, PNG and WebP artwork. Authenticated admin uploads are sent through the server-side API and limited to 4 MB. Apply it before using event photo uploads.
 
+The premium-experience migration extends checkout pricing with server-calculated fees and promotions, adds event arrival data and tier benefits, and provides atomic admin update functions. Promotion redemptions count paid purchases and unexpired reservations; checkout revalidates under a promotion row lock. Ticket-tier edits are locked once an order exists, and venue/service-fee updates are transactional and restricted to draft or scheduled events.
+
 The commerce migration extends the core schema and replaces gate check-in logic to reject cancelled, postponed, completed or out-of-window events. The verification migration adds assigned staff, scan retry IDs, rate limits, public verification, operations metrics and approval-based transfers. It uses only `ticketing_*` objects, enables RLS on new tables, revokes browser-role access and grants server-side access to `service_role`. Do not enable sales unless every migration has completed successfully.
+
+Set the real event city and confirmed venue destination in the admin before opening ticket sales. Directions are hidden until a Google Maps link, coordinate pair, or complete venue address and city are saved. Leave parking, entrance and transport instructions blank until the organizer confirms them; the site will clearly show that the details are not published yet.
 
 The platform must keep its service-role key server-side. API access to admin functions requires an authenticated platform owner/admin session. Do not expose provider credentials or guest ticket credentials in client-side environment variables or logs.
 

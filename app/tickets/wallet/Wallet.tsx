@@ -4,10 +4,28 @@ import { type FormEvent, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 
 type WalletData = {
   order: { reference: string; buyerName: string; amountMinor: number | null; currency: string | null; paidAt: string | null; isTransferredTicket: boolean };
-  event: { title: string; starts_at: string; ends_at: string; venue_name: string; venue_address: string; city: string; timezone: string; age_limit: number | null };
+  event: {
+    title: string;
+    starts_at: string;
+    ends_at: string;
+    venue_name: string;
+    venue_address: string;
+    city: string;
+    timezone: string;
+    age_limit: number | null;
+    cover_image_url: string | null;
+    venue_maps_url: string;
+    venue_latitude: number | null;
+    venue_longitude: number | null;
+    entrance_instructions: string;
+    parking_details: string;
+    transport_guidance: string;
+    dress_code: string;
+  };
   tickets: Array<{ id: string; reference: string; tier: string; status: string; issuedAt: string; checkedInAt: string | null; credential: string | null }>;
 };
 
@@ -91,6 +109,7 @@ export default function Wallet() {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const mapLinks = data ? getVenueMapLinks(data.event) : null;
 
   async function load() {
     setLoading(true);
@@ -126,11 +145,24 @@ export default function Wallet() {
         {error && !loading && <div role="alert" className="rounded-2xl border border-orange-300/20 bg-[#17121e] p-6"><p className="text-sm text-slate-200">{error}</p>{!data && <Link href="/tickets/access" className="mt-4 inline-block text-xs font-bold text-orange-200">Request a fresh secure wallet link</Link>}</div>}
         {data && (
           <>
-            <section className="rounded-2xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
-              <p className="text-xs font-black uppercase text-orange-200">{data.event.title}</p>
-              <p className="mt-2 text-sm">{localDate(data.event.starts_at, data.event.timezone)}</p>
-              <p className="mt-1 text-xs text-slate-400">{data.event.venue_name}{data.event.venue_address ? ` · ${data.event.venue_address}` : ''}, {data.event.city}</p>
-              <p className="mt-3 text-[10px] text-slate-500">{data.order.isTransferredTicket ? `Transferred ticket ${data.order.reference} · owner approval recorded` : `Order ${data.order.reference} · ${new Intl.NumberFormat('en-KE', { style: 'currency', currency: data.order.currency?.trim() || 'KES' }).format(Number(data.order.amountMinor || 0) / 100)}`}</p>
+            <section className="relative isolate overflow-hidden rounded-2xl border border-orange-300/15 bg-[#17121e] p-5 sm:p-6">
+              {data.event.cover_image_url && <Image src={data.event.cover_image_url} alt="" fill sizes="(max-width: 768px) 100vw, 896px" unoptimized className="object-cover opacity-20" />}
+              <div className="relative z-10">
+                <p className="text-xs font-black uppercase text-orange-200">{data.event.title}</p>
+                <p className="mt-2 text-sm">{localDate(data.event.starts_at, data.event.timezone)}</p>
+                <p className="mt-1 text-xs text-slate-300">{data.event.venue_name}{data.event.venue_address ? ` · ${data.event.venue_address}` : ''}, {data.event.city}</p>
+                {data.event.dress_code && <p className="mt-2 text-xs text-slate-300">Dress code: {data.event.dress_code}</p>}
+                <p className="mt-3 text-[10px] text-slate-300">{data.order.isTransferredTicket ? `Transferred ticket ${data.order.reference} · owner approval recorded` : `Order ${data.order.reference} · ${new Intl.NumberFormat('en-KE', { style: 'currency', currency: data.order.currency?.trim() || 'KES' }).format(Number(data.order.amountMinor || 0) / 100)}`}</p>
+                {(data.event.entrance_instructions || data.event.parking_details || data.event.transport_guidance) && <div className="mt-4 space-y-2 border-t border-white/10 pt-3 text-xs leading-5 text-slate-200">
+                  {data.event.entrance_instructions && <p><strong>Entry:</strong> {data.event.entrance_instructions}</p>}
+                  {data.event.parking_details && <p><strong>Parking:</strong> {data.event.parking_details}</p>}
+                  {data.event.transport_guidance && <p><strong>Transport & arrival:</strong> {data.event.transport_guidance}</p>}
+                </div>}
+                {mapLinks && <div className="mt-4 flex flex-wrap gap-2">
+                    <a href={mapLinks.map} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center rounded-lg border border-white/15 px-3 text-[10px] font-bold text-orange-100 hover:bg-white/5">View venue on Google Maps</a>
+                    <a href={mapLinks.directions} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center rounded-lg border border-white/15 px-3 text-[10px] font-bold text-orange-100 hover:bg-white/5">Get directions</a>
+                  </div>}
+              </div>
             </section>
             {data.tickets.length ? data.tickets.map(ticket => <GuestTicket key={ticket.id} ticket={ticket} />) : <p className="rounded-2xl border border-amber-200/20 bg-amber-950/20 p-5 text-sm text-amber-100">Payment is confirmed, but tickets are not yet available. Contact support and provide order reference {data.order.reference}.</p>}
           </>

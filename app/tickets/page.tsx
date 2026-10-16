@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import { CalendarDays, ChevronRight, Clock3, Ghost, MapPin, ShieldCheck, Ticket } from 'lucide-react';
+import { CalendarDays, ChevronRight, Clock3, Ghost, MapPin, Navigation, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvents, type PublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
+import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ function formatPrice(amount: number, currency: string) {
 function EventCard({ event }: { event: PublicTicketEvent }) {
   const prices = event.ticket_types.map(ticketType => ticketType.price_minor);
   const lowestPrice = Math.min(...prices);
+  const mapLinks = getVenueMapLinks(event);
 
   return (
     <article className="group overflow-hidden rounded-3xl border border-white/10 bg-[#17121e] shadow-xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-orange-300/30 hover:shadow-orange-950/20">
@@ -59,16 +61,19 @@ function EventCard({ event }: { event: PublicTicketEvent }) {
           <span className="inline-flex items-center gap-2"><CalendarDays size={14} className="text-orange-300" />{formatEventDate(event.starts_at, event.timezone)}</span>
           {event.doors_open_at && <span className="inline-flex items-center gap-2"><Clock3 size={14} className="text-orange-300" />Doors {formatEventDate(event.doors_open_at, event.timezone)}</span>}
         </div>
+        {event.dress_code && <p className="mt-3 text-xs text-slate-300"><span className="font-bold text-orange-100">Dress code:</span> {event.dress_code}</p>}
         <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-400">{event.description || 'Get ready for a night out. Event details and ticket options are available here.'}</p>
         <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-white/[0.08] pt-4">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-500">Tickets from</p>
             <p className="mt-1 text-lg font-black text-orange-100">{formatPrice(lowestPrice, event.ticket_types[0]?.currency || 'KES')}</p>
+            <p className="mt-1 text-[10px] text-slate-500">+ {formatPrice(event.service_fee_minor, event.ticket_types[0]?.currency || 'KES')} service fee per ticket</p>
           </div>
           <Link href={`/tickets/${encodeURIComponent(event.slug)}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-400 px-4 text-xs font-black text-[#170d18] transition hover:bg-orange-300">
-            Event & tickets <ChevronRight size={15} />
+            Get tickets <ChevronRight size={15} />
           </Link>
         </div>
+        {mapLinks && <a href={mapLinks.map} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-9 items-center gap-2 text-xs font-bold text-orange-200 hover:text-white"><Navigation size={14} /> View venue on Google Maps</a>}
       </div>
     </article>
   );
