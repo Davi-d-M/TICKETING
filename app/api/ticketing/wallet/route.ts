@@ -71,8 +71,9 @@ export async function GET() {
   let walletTicketsQuery = database.from('ticketing_tickets')
     .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_ciphertext,attendee_name,attendee_email')
     .in('order_item_id', itemIds)
+    .eq('attendee_email', session.email.trim().toLowerCase())
     .order('issued_at', { ascending: true });
-  if (session.ticketId) walletTicketsQuery = walletTicketsQuery.eq('id', session.ticketId).eq('attendee_email', session.email);
+  if (session.ticketId) walletTicketsQuery = walletTicketsQuery.eq('id', session.ticketId);
   const ticketsResult = itemIds.length ? await walletTicketsQuery : { data: [], error: null };
   if (ticketsResult.error) {
     console.error('[TicketingWallet] Could not load issued tickets:', ticketsResult.error);
