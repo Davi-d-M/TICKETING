@@ -1,10 +1,10 @@
-import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
 import { gateCookieName, readGateStaffSession } from '@/lib/ticketing/gateAccess.server';
 import { consumeTicketingRateLimit } from '@/lib/ticketing/rateLimit.server';
+import { readRotatingTicketCredential } from '@/lib/ticketing/rotatingCredential.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,20 +82,44 @@ export async function POST(request: Request) {
   const deviceId = typeof body.deviceId === 'string' ? body.deviceId : '';
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   if (!uuidPattern.test(eventId) || !uuidPattern.test(requestId)
-    || !/^[A-Za-z0-9_-]{40,60}$/.test(credential)
+    || !/^[A-Za-z0-9_-]{20,512}\.[A-Za-z0-9_-]{40,60}$/.test(credential)
     || !gateName || gateName.length > 120 || deviceId.length > 160) {
     return NextResponse.json({ error: 'The assigned event or scanned ticket code is invalid.' }, { status: 400 });
   }
 
   const database = createServerSupabaseClient();
   if (!database) return NextResponse.json({ error: 'Ticketing storage is not configured.' }, { status: 503 });
+  let rotatingCredential: ReturnType<typeof readRotatingTicketCredential>;
   try {
+    rotatingCredential = readRotatingTicketCredential(credential);
+  } catch (cause) {
+    console.error('[TicketingGate] Rotating QR signing is not configured:', cause);
+    return NextResponse.json({ error: 'TICKETING_QR_SIGNING_SECRET must be configured with at least 32 characters.' }, { status: 503 });
+  }
+  if (!rotatingCredential) return NextResponse.json({ error: 'This QR code is invalid or expired. Refresh the ticket wallet and scan the current code.' }, { status: 400 });
+  try {
+    const { data: ticket, error: ticketError } = await database.from('ticketing_tickets')
+      .select('credential_hash,status')
+      .eq('id', rotatingCredential.ticketId)
+      .eq('event_id', eventId)
+      .maybeSingle();
+    if (ticketError) {
+      console.error('[TicketingGate] Could not resolve rotating ticket credential:', ticketError);
+      return NextResponse.json({ error: 'Ticket admission could not be checked.' }, { status: 503 });
+    }
+    if (!ticket || typeof ticket.status !== 'string' || !['issued', 'checked_in'].includes(ticket.status)) {
+      return NextResponse.json({ error: 'This ticket is not active for the selected event.' }, { status: 404 });
+    }
+    if (typeof ticket.credential_hash !== 'string' || !/^[0-9a-f]{64}$/.test(ticket.credential_hash)) {
+      console.error('[TicketingGate] Active ticket has an invalid credential hash:', rotatingCredential.ticketId);
+      return NextResponse.json({ error: 'The stored ticket credential is invalid. Contact event support.' }, { status: 503 });
+    }
     if (!await consumeTicketingRateLimit(request, `gate:${session.email}`, 120, 60)) {
       return NextResponse.json({ error: 'Scanner rate limit reached. Wait one minute and try again.' }, { status: 429 });
     }
     const { data, error } = await database.rpc('ticketing_check_in', {
       p_event_id: eventId,
-      p_credential_hash: createHash('sha256').update(credential).digest('hex'),
+      p_credential_hash: ticket.credential_hash,
       p_gate_name: gateName,
       p_staff_user_id: null,
       p_device_id: deviceId || `gate:${session.email}`,

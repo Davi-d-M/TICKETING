@@ -2,7 +2,8 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
-import { decryptTicketCredential, readGuestSession } from '@/lib/ticketing/commerce.server';
+import { readGuestSession } from '@/lib/ticketing/commerce.server';
+import { createRotatingTicketCredential } from '@/lib/ticketing/rotatingCredential.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +70,7 @@ export async function GET() {
 
   const itemIds = (items || []).map(item => item.id);
   let walletTicketsQuery = database.from('ticketing_tickets')
-    .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_ciphertext,attendee_name,attendee_email')
+    .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_hash,attendee_name,attendee_email')
     .in('order_item_id', itemIds)
     .eq('attendee_email', session.email.trim().toLowerCase())
     .order('issued_at', { ascending: true });
@@ -99,13 +100,11 @@ export async function GET() {
         || typeof ticket.attendee_name !== 'string') {
         throw new Error('An issued ticket record is incomplete.');
       }
-      const hasEntryCredential = ticket.status === 'issued' || ticket.status === 'checked_in';
-      const encryptedCredential = typeof ticket.credential_ciphertext === 'string'
-        ? ticket.credential_ciphertext
-        : null;
-      if (hasEntryCredential && !encryptedCredential) {
+      const isActive = ticket.status === 'issued';
+      if (isActive && (typeof ticket.credential_hash !== 'string' || !/^[0-9a-f]{64}$/.test(ticket.credential_hash))) {
         throw new Error('An active ticket credential is unavailable.');
       }
+      const rotatingCredential = isActive ? createRotatingTicketCredential(ticket.id) : null;
       return {
         id: ticket.id,
         reference: ticket.ticket_reference,
@@ -114,9 +113,8 @@ export async function GET() {
         issuedAt: ticket.issued_at,
         checkedInAt: ticket.checked_in_at,
         buyerName: ticket.attendee_name,
-        credential: hasEntryCredential && encryptedCredential
-          ? decryptTicketCredential(encryptedCredential)
-          : null
+        credential: rotatingCredential?.credential || null,
+        credentialExpiresAt: rotatingCredential?.expiresAt || null
       };
     });
     return NextResponse.json({
@@ -132,8 +130,8 @@ export async function GET() {
       tickets
     }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (cause) {
-    console.error('[TicketingWallet] Could not decrypt issued ticket credentials:', cause);
-    return NextResponse.json({ error: 'Ticket credentials could not be opened. Contact event support.' }, { status: 503 });
+    console.error('[TicketingWallet] Could not issue rotating ticket credentials:', cause);
+    return NextResponse.json({ error: 'Ticket credentials could not be issued. Contact event support.' }, { status: 503 });
   }
 }
 

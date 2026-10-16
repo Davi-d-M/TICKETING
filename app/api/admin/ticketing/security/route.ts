@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession, isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
+import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,98 @@ export async function GET() {
   }
 
   const cases = (casesResult.data || []) as SecurityCase[];
+  const adminEmail = process.env.TICKETING_ADMIN_EMAIL?.trim().toLowerCase() || '';
+  const [
+    mfaResult,
+    paymentSchema,
+    walletSchema,
+    walletLinksSchema,
+    rotatingQrSchema,
+    scannerAccountsSchema,
+    scannerAssignmentsSchema,
+    rateLimitSchema,
+    salesReady
+  ] = await Promise.all([
+    database.from('ticketing_admin_mfa').select('active').eq('email', adminEmail).maybeSingle(),
+    database.from('ticketing_payment_attempts').select('id').limit(0),
+    database.from('ticketing_orders').select('id').limit(0),
+    database.from('ticketing_guest_access_links').select('id').limit(0),
+    database.from('ticketing_tickets').select('id,event_id,status,credential_hash,attendee_email').limit(0),
+    database.from('ticketing_gate_staff_accounts').select('email').limit(0),
+    database.from('ticketing_gate_staff_assignments').select('event_id,gate_name').limit(0),
+    database.from('ticketing_rate_limit_windows').select('bucket_hash').limit(0),
+    isTicketingSalesReady()
+  ]);
+  const hasSecret = (value: string | undefined) => (value?.trim().length || 0) >= 32;
+  const paymentMode = process.env.TICKETING_PAYMENT_MODE?.trim();
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY?.trim() || '';
+  const paystackKeyConfigured = (paymentMode === 'test' && paystackSecret.startsWith('sk_test_'))
+    || (paymentMode === 'live' && paystackSecret.startsWith('sk_live_'));
+  const paymentDatabaseReady = !paymentSchema.error && !walletSchema.error;
+  const mfaConfigured = !mfaResult.error && mfaResult.data?.active === true
+    && hasSecret(process.env.TICKETING_MFA_ENCRYPTION_KEY)
+    && hasSecret(process.env.TICKETING_SESSION_SECRET);
+  const qrConfigured = !rotatingQrSchema.error && hasSecret(process.env.TICKETING_QR_SIGNING_SECRET);
+  const walletConfigured = !walletSchema.error && !walletLinksSchema.error
+    && hasSecret(process.env.TICKETING_GUEST_SESSION_SECRET);
+  const scannerConfigured = !scannerAccountsSchema.error && !scannerAssignmentsSchema.error && !rateLimitSchema.error
+    && hasSecret(process.env.TICKETING_GATE_SESSION_SECRET);
+  const controls = [
+    {
+      id: 'mfa',
+      state: mfaResult.error ? 'Migration required' : mfaConfigured ? 'Authenticator enrolled' : 'Enrollment required',
+      ready: mfaConfigured,
+      description: mfaResult.error
+        ? 'Apply the Ticketing MFA migration and configure its encryption key before admin sessions can be issued.'
+        : mfaConfigured
+          ? 'Admin sessions are issued only after password and authenticator verification. Accepted TOTP steps are atomically replay-protected.'
+          : 'Password login starts a short-lived challenge; authenticator enrollment is required before an admin session is granted.'
+    },
+    {
+      id: 'wallet',
+      state: walletConfigured ? 'Configured · scoped' : 'Configuration required',
+      ready: walletConfigured,
+      description: 'Guest wallet links are scoped to the paid order or transferred ticket, protected by an HttpOnly session, and loaded from isolated Ticketing records.'
+    },
+    {
+      id: 'paystack',
+      state: !paymentDatabaseReady ? 'Migration required' : paystackKeyConfigured ? `Configured · ${paymentMode}` : 'Configuration required',
+      ready: paymentDatabaseReady && paystackKeyConfigured,
+      description: 'Paystack KES checkout, signed webhook handling, independent server-side verification, and idempotent payment records are implemented. This checks key format and schema, not provider API reachability or a successful test transaction.'
+    },
+    {
+      id: 'rotating-qr',
+      state: rotatingQrSchema.error ? 'Migration required' : qrConfigured ? 'Five-minute QR enabled' : 'Signing key required',
+      ready: qrConfigured,
+      description: 'Wallet QR values are signed, ticket-specific credentials that expire after five minutes. Both admin and assigned-staff scanners verify expiry and resolve the ticket before atomic check-in.'
+    },
+    {
+      id: 'scanner',
+      state: scannerConfigured ? 'Configured · assigned staff' : 'Configuration required',
+      ready: scannerConfigured,
+      description: 'Online scanners require an active staff account and event/gate assignment. Database check-in is atomic and request-idempotent; offline admission is not supported.'
+    },
+    {
+      id: 'incident',
+      state: 'Case audit connected',
+      ready: true,
+      description: 'Incident cases and case actions are stored in the Ticketing security tables. This does not ingest WAF, provider, database-denial, or automated threat signals.'
+    },
+    {
+      id: 'backup',
+      state: 'Manual verification required',
+      ready: false,
+      description: 'Supabase backup scheduling and a successful restore drill cannot be verified from application code. Confirm them in the provider project and record a restore-test result.'
+    },
+    {
+      id: 'release',
+      state: salesReady ? 'Release checks passed' : 'Sales release blocked',
+      ready: salesReady,
+      description: salesReady
+        ? 'Required sales secrets, release approvals, and commerce schema checks are passing.'
+        : `Sales release requires configured payment/email/session secrets, required migrations, TICKETING_SALES_ENABLED=true, and TICKETING_RELEASE_APPROVED=true. Current switches: sales ${process.env.TICKETING_SALES_ENABLED === 'true' ? 'on' : 'off'}, approval ${process.env.TICKETING_RELEASE_APPROVED === 'true' ? 'on' : 'off'}.`
+    }
+  ];
 
   return NextResponse.json({
     cases,
@@ -111,6 +204,7 @@ export async function GET() {
       false_positive: falsePositiveCount.count || 0
     },
     canManageCases: session?.role.toLowerCase() === 'owner',
+    controls,
     monitoring: {
       source: 'Ticketing security case activity only',
       automatedDetection: false

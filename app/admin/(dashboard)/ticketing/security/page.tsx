@@ -62,6 +62,13 @@ type CaseActivity = {
   created_at: string;
 };
 
+type ReadinessControl = {
+  id: string;
+  state: string;
+  ready: boolean;
+  description: string;
+};
+
 type SecurityData = {
   cases: SecurityCase[];
   events: SecurityEvent[];
@@ -69,6 +76,7 @@ type SecurityData = {
   counts: Record<CaseStatus, number>;
   canManageCases: boolean;
   monitoring: { source: string; automatedDetection: boolean };
+  controls: ReadinessControl[];
 };
 
 const selectClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-[#17121e] px-3 text-sm text-white outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/15';
@@ -102,14 +110,14 @@ const categoryLabels: Record<string, string> = {
 };
 
 const releaseControls = [
-  { icon: KeyRound, title: 'Privileged MFA & sessions', state: 'Not connected', description: 'Ticketing does not yet verify MFA, passkeys, new-device signals or revoke-all sessions.' },
-  { icon: LockKeyhole, title: 'Customer & organizer isolation', state: 'Not connected', description: 'There are no customer wallet or organizer-facing Ticketing endpoints yet to exercise isolation against.' },
-  { icon: WalletCards, title: 'M-Pesa payment integrity', state: 'Not connected', description: 'No Daraja checkout, authenticated callback, transaction reconciliation or refund flow is active.' },
-  { icon: Ticket, title: 'Rotating ticket credentials', state: 'Not connected', description: 'No customer ticket wallet or five-minute QR credential endpoint has been implemented.' },
-  { icon: ScanLine, title: 'Authorized gate scanning', state: 'Database foundation', description: 'An atomic check-in database primitive exists; scanner sessions and event-scoped staff authorization are not live.' },
-  { icon: FileClock, title: 'Protected incident evidence', state: 'Case activity only', description: 'This centre records case changes in append-only logs; automated threat detections are not wired into those logs.' },
-  { icon: Fingerprint, title: 'Recovery & backup drills', state: 'Not connected', description: 'Backup health, restore tests and emergency recovery have no verified signal in this module.' },
-  { icon: ShieldCheck, title: 'Production release gate', state: 'Not cleared', description: 'The Ticketing core and security migrations must be reviewed and applied before database-backed use.' }
+  { id: 'mfa', icon: KeyRound, title: 'Privileged MFA & sessions' },
+  { id: 'wallet', icon: LockKeyhole, title: 'Customer wallet isolation' },
+  { id: 'paystack', icon: WalletCards, title: 'Paystack payment integrity' },
+  { id: 'rotating-qr', icon: Ticket, title: 'Rotating ticket credentials' },
+  { id: 'scanner', icon: ScanLine, title: 'Authorized gate scanning' },
+  { id: 'incident', icon: FileClock, title: 'Protected incident evidence' },
+  { id: 'backup', icon: Fingerprint, title: 'Recovery & backup drills' },
+  { id: 'release', icon: ShieldCheck, title: 'Production release gate' }
 ];
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -241,21 +249,22 @@ export default function TicketingSecurityPage() {
             <div>
               <p className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-violet-200"><ShieldCheck size={14} /> Launch readiness</p>
               <h2 id="readiness-heading" className="mt-2 text-xl font-black tracking-tight sm:text-2xl">What Ticketing can actually protect today</h2>
-              <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">These are implementation states, not green checks from a scan. Items labelled “Not connected” need their own implementation and verification before ticket sales.</p>
+              <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">Status is checked from server configuration and Ticketing database schema. Provider-side backup and restore status remains manual until independently verified.</p>
             </div>
-            <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-200">Sales release: blocked</span>
+            <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-200">{data?.controls.find(control => control.id === 'release')?.state || 'Checking release'}</span>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {releaseControls.map(control => (
-              <article key={control.title} className="rounded-2xl border border-white/[0.08] bg-black/20 p-4">
+            {releaseControls.map(control => {
+              const readiness = data?.controls.find(item => item.id === control.id);
+              return <article key={control.id} className="rounded-2xl border border-white/[0.08] bg-black/20 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <span className="rounded-xl bg-violet-300/10 p-2 text-violet-200"><control.icon size={17} /></span>
-                  <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${control.state === 'Not connected' || control.state === 'Not cleared' ? 'border-orange-300/20 bg-orange-300/10 text-orange-200' : 'border-violet-300/20 bg-violet-300/10 text-violet-200'}`}>{control.state}</span>
+                  <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${readiness?.ready ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' : 'border-orange-300/20 bg-orange-300/10 text-orange-200'}`}>{readiness?.state || 'Checking'}</span>
                 </div>
                 <h3 className="mt-3 text-sm font-black text-white">{control.title}</h3>
-                <p className="mt-1.5 text-[11px] leading-5 text-slate-400">{control.description}</p>
+                <p className="mt-1.5 text-[11px] leading-5 text-slate-400">{readiness?.description || 'Live readiness data is not available yet.'}</p>
               </article>
-            ))}
+            })}
           </div>
         </section>
 

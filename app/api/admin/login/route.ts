@@ -1,12 +1,14 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  adminMfaChallengeCookie,
   adminSessionCookie,
-  adminSessionLifetimeSeconds,
-  createAdminSessionToken,
+  createAdminMfaChallengeToken,
   isSameOriginRequest,
   type TicketingAdminSession
 } from '@/lib/adminAccess.server';
+import { createServerSupabaseClient } from '@/lib/serverSupabase';
+import { consumeTicketingRateLimit } from '@/lib/ticketing/rateLimit.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +43,14 @@ export async function POST(request: NextRequest) {
     || body.email.length > 320 || body.password.length > 1024) {
     return NextResponse.json({ error: 'Enter a valid email and password.' }, { status: 400 });
   }
+  try {
+    if (!await consumeTicketingRateLimit(request, 'admin-login', 10, 300)) {
+      return NextResponse.json({ error: 'Too many sign-in attempts. Wait five minutes before trying again.' }, { status: 429 });
+    }
+  } catch (cause) {
+    console.error('[TicketingLogin] Could not enforce sign-in rate limit:', cause);
+    return NextResponse.json({ error: 'Sign-in protection is unavailable. Configure the Ticketing rate-limit migration and guest-session key.' }, { status: 503 });
+  }
 
   const emailMatches = constantTimeEqual(body.email.trim().toLowerCase(), adminEmail);
   const passwordMatches = constantTimeEqual(body.password, adminPassword);
@@ -50,21 +60,51 @@ export async function POST(request: NextRequest) {
 
   const roleValue = process.env.TICKETING_ADMIN_ROLE?.trim().toLowerCase();
   const role: TicketingAdminSession['role'] = roleValue === 'admin' ? 'admin' : 'owner';
-  let token: string;
-  try {
-    token = createAdminSessionToken({ email: adminEmail, role });
-  } catch (error) {
-    console.error('[TicketingLogin] Could not create admin session:', error);
-    return NextResponse.json({ error: 'Admin session could not be created.' }, { status: 503 });
+  const database = createServerSupabaseClient();
+  if (!database) {
+    return NextResponse.json({ error: 'Ticketing MFA storage is unavailable. Configure Supabase before signing in.' }, { status: 503 });
+  }
+  const { data: mfaRecord, error: mfaError } = await database
+    .from('ticketing_admin_mfa')
+    .select('active')
+    .eq('email', adminEmail)
+    .maybeSingle();
+  if (mfaError) {
+    console.error('[TicketingLogin] Could not load mandatory MFA enrollment:', mfaError);
+    return NextResponse.json({
+      error: 'Authenticator MFA is required. Apply supabase/TICKETING_MFA_MIGRATION.sql and configure TICKETING_MFA_ENCRYPTION_KEY before signing in.'
+    }, { status: 503 });
+  }
+  if (mfaRecord?.active && (process.env.TICKETING_MFA_ENCRYPTION_KEY?.trim().length || 0) < 32) {
+    return NextResponse.json({ error: 'TICKETING_MFA_ENCRYPTION_KEY must contain at least 32 characters.' }, { status: 503 });
   }
 
-  const response = NextResponse.json({ authenticated: true });
-  response.cookies.set(adminSessionCookie, token, {
+  let challengeToken: string;
+  try {
+    challengeToken = createAdminMfaChallengeToken({ email: adminEmail, role });
+  } catch (error) {
+    console.error('[TicketingLogin] Could not create MFA challenge:', error);
+    return NextResponse.json({ error: 'The authenticator challenge could not be created.' }, { status: 503 });
+  }
+
+  const response = NextResponse.json({
+    authenticated: false,
+    mfaRequired: true,
+    setupRequired: !mfaRecord?.active
+  });
+  response.cookies.set(adminMfaChallengeCookie, challengeToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
-    maxAge: adminSessionLifetimeSeconds
+    maxAge: 5 * 60
+  });
+  response.cookies.set(adminSessionCookie, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 0
   });
   return response;
 }
@@ -75,6 +115,13 @@ export async function DELETE(request: NextRequest) {
   }
   const response = NextResponse.json({ authenticated: false });
   response.cookies.set(adminSessionCookie, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 0
+  });
+  response.cookies.set(adminMfaChallengeCookie, '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

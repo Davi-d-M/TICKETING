@@ -9,6 +9,13 @@ const sessionLifetimeSeconds = 4 * 60 * 60;
 export type TicketingAdminSession = {
   email: string;
   role: 'owner' | 'admin';
+  mfaVerified: true;
+};
+
+export type TicketingMfaChallenge = {
+  email: string;
+  role: 'owner' | 'admin';
+  expiresAt: number;
 };
 
 function sessionSecret() {
@@ -32,9 +39,44 @@ export function createAdminSessionToken(session: TicketingAdminSession, now = Da
   const payload = Buffer.from(JSON.stringify({
     email: session.email,
     role: session.role,
+    mfaVerified: session.mfaVerified,
     expiresAt: Math.floor(now / 1000) + sessionLifetimeSeconds
   })).toString('base64url');
   return `${payload}.${sign(payload, secret)}`;
+}
+
+export function createAdminMfaChallengeToken(
+  challenge: Omit<TicketingMfaChallenge, 'expiresAt'>,
+  now = Date.now()
+) {
+  const secret = sessionSecret();
+  if (!secret) throw new Error('TICKETING_SESSION_SECRET must be configured with at least 32 characters.');
+  const payload = Buffer.from(JSON.stringify({
+    ...challenge,
+    expiresAt: Math.floor(now / 1000) + 5 * 60
+  })).toString('base64url');
+  return `${payload}.${sign(payload, secret)}`;
+}
+
+export function readAdminMfaChallenge(token: string | undefined, now = Date.now()): TicketingMfaChallenge | null {
+  const secret = sessionSecret();
+  if (!secret || !token) return null;
+  const [payload, signature, extra] = token.split('.');
+  if (!payload || !signature || extra || !safeEqual(signature, sign(payload, secret))) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<TicketingMfaChallenge>;
+    if (typeof decoded.email !== 'string'
+      || !['owner', 'admin'].includes(String(decoded.role))
+      || typeof decoded.expiresAt !== 'number'
+      || decoded.expiresAt <= Math.floor(now / 1000)) return null;
+    return {
+      email: decoded.email,
+      role: decoded.role as TicketingMfaChallenge['role'],
+      expiresAt: decoded.expiresAt
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getAdminSession(): Promise<TicketingAdminSession | null> {
@@ -51,14 +93,16 @@ export async function getAdminSession(): Promise<TicketingAdminSession | null> {
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
       email?: unknown;
       role?: unknown;
+      mfaVerified?: unknown;
       expiresAt?: unknown;
     };
     if (typeof decoded.email !== 'string'
       || !['owner', 'admin'].includes(String(decoded.role))
+      || decoded.mfaVerified !== true
       || typeof decoded.expiresAt !== 'number'
       || decoded.expiresAt <= Math.floor(Date.now() / 1000)) return null;
 
-    return { email: decoded.email, role: decoded.role as TicketingAdminSession['role'] };
+    return { email: decoded.email, role: decoded.role as TicketingAdminSession['role'], mfaVerified: true };
   } catch {
     return null;
   }
@@ -76,3 +120,6 @@ export function isSameOriginRequest(request: Request) {
 
 export const adminSessionCookie = cookieName;
 export const adminSessionLifetimeSeconds = sessionLifetimeSeconds;
+export const adminMfaChallengeCookie = process.env.NODE_ENV === 'production'
+  ? '__Host-ticketing-mfa'
+  : 'ticketing-mfa';

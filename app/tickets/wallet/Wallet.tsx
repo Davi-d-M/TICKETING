@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -26,7 +26,7 @@ type WalletData = {
     transport_guidance: string;
     dress_code: string;
   };
-  tickets: Array<{ id: string; reference: string; tier: string; status: string; issuedAt: string; checkedInAt: string | null; credential: string | null }>;
+  tickets: Array<{ id: string; reference: string; tier: string; status: string; issuedAt: string; checkedInAt: string | null; credential: string | null; credentialExpiresAt: number | null }>;
 };
 
 function localDate(value: string, timezone: string) {
@@ -85,6 +85,7 @@ function GuestTicket({ ticket }: { ticket: WalletData['tickets'][number] }) {
         <p className="mt-2 text-xs text-slate-400">Status: <span className="font-bold uppercase text-emerald-200">{ticket.status.replaceAll('_', ' ')}</span></p>
         {ticket.checkedInAt && <p className="mt-1 text-xs text-slate-400">Admitted: {new Date(ticket.checkedInAt).toLocaleString('en-KE')}</p>}
         <p className="mt-3 max-w-md text-[10px] leading-4 text-slate-500">Keep this code private. Entry is validated online, and each ticket can be admitted only once.</p>
+        {ticket.credentialExpiresAt && <p className="mt-1 text-[10px] text-slate-500">This QR rotates every five minutes and refreshes automatically while this wallet is open.</p>}
         <Link href={`/tickets/verify?reference=${encodeURIComponent(ticket.reference)}`} className="mt-3 inline-block text-xs font-bold text-orange-200 hover:text-white">Check official ticket record</Link>
         {ticket.status === 'issued' && <div className="mt-4">
           {!showTransfer
@@ -111,22 +112,35 @@ export default function Wallet() {
   const [loading, setLoading] = useState(true);
   const mapLinks = data ? getVenueMapLinks(data.event) : null;
 
-  async function load() {
-    setLoading(true);
-    setError('');
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const response = await fetch('/api/ticketing/wallet', { cache: 'no-store' });
       const result = await response.json() as WalletData & { error?: string };
       if (!response.ok) throw new Error(result.error || 'Ticket wallet could not be loaded.');
       setData(result);
+      setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Ticket wallet could not be loaded.');
+      if (silent) window.setTimeout(() => { void load(true); }, 15000);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const expirationTimes = (data?.tickets || [])
+      .map(ticket => ticket.credentialExpiresAt)
+      .filter((value): value is number => typeof value === 'number');
+    if (!expirationTimes.length) return;
+    const refreshAt = Math.min(...expirationTimes);
+    const timeout = window.setTimeout(() => { void load(true); }, Math.max(250, refreshAt - Date.now() + 250));
+    return () => window.clearTimeout(timeout);
+  }, [data, load]);
 
   async function logout() {
     await fetch('/api/ticketing/wallet', { method: 'POST' });
