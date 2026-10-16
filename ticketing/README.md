@@ -1,4 +1,4 @@
-# ONLINE BAR Ticketing
+# Midnight Society KE Ticketing
 
 The standalone Ticketing application is managed at `/admin/ticketing` and serves event discovery at `/tickets`. It stores data in isolated `ticketing_*` Supabase tables; it does not use drink-order, product inventory, merchant payout or waitlist tables.
 

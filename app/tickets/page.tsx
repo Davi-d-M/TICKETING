@@ -6,8 +6,8 @@ import { getPublicTicketEvents, type PublicTicketEvent } from '@/lib/ticketing/p
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Halloween Tickets | ONLINE BAR',
-  description: 'Find your next after-dark event with ONLINE BAR Ticketing.'
+  title: 'Halloween Tickets | Midnight Society KE',
+  description: 'Find your next after-dark event with Midnight Society KE Ticketing.'
 };
 
 function formatEventDate(value: string, timezone: string) {
@@ -84,10 +84,10 @@ export default async function TicketDiscoveryPage() {
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-1/3 -z-10 h-80 w-80 rounded-full bg-violet-500/15 blur-[90px]" />
           <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-orange-100"><Ghost size={14} /> ONLINE BAR · Halloween nights</div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-orange-100"><Ghost size={14} /> MIDNIGHT SOCIETY KE · Halloween nights</div>
               <p className="mt-6 text-[10px] font-black uppercase tracking-[0.25em] text-violet-200">The night is yours</p>
               <h1 className="mt-2 text-4xl font-black leading-[0.98] tracking-tight text-white sm:text-6xl lg:text-7xl">Find your<br />after-dark<span className="text-orange-400">.</span></h1>
-              <p className="mt-5 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">Discover events worth staying up for. Choose your night, check the details, and find ticket options in one spooky little corner of ONLINE BAR.</p>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">Discover events worth staying up for. Choose your night, check the details, and find ticket options in one spooky little corner of Midnight Society KE.</p>
             </div>
             <div className="w-fit rounded-2xl border border-white/10 bg-black/20 p-4 backdrop-blur">
               <div className="flex items-center gap-3"><span className="rounded-xl bg-orange-300/10 p-2.5 text-orange-200"><Ticket size={20} /></span><div><p className="text-xl font-black">{result.ok ? result.events.length : '—'}</p><p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Events on sale</p></div></div>
@@ -103,7 +103,7 @@ export default async function TicketDiscoveryPage() {
         <section className="space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">Enter if you dare</p><h2 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">Events on the list</h2></div>
-            <span className="text-xs text-slate-500">Official ONLINE BAR Ticketing listings</span>
+            <span className="text-xs text-slate-500">Official Midnight Society KE ticket listings</span>
           </div>
           {!result.ok ? (
             <div role="alert" className="rounded-2xl border border-white/10 bg-[#17121e] p-7 text-sm leading-6 text-slate-300">{result.message}</div>
@@ -119,8 +119,8 @@ export default async function TicketDiscoveryPage() {
         </section>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-5 text-[10px] text-slate-500">
-          <span>ONLINE BAR Ticketing · Your night. Your ticket. No tricks.</span>
-          <Link href="/" className="font-bold text-orange-200 transition hover:text-white">Back to Online Bar</Link>
+          <span>Midnight Society KE · Your night. Your ticket. No tricks.</span>
+          <Link href="/" className="font-bold text-orange-200 transition hover:text-white">Home</Link>
         </footer>
       </div>
     </main>

@@ -38,7 +38,7 @@ export function createServerSupabaseClient() {
       detectSessionInUrl: false
     },
     global: {
-      headers: { 'X-Client-Info': 'onlinebar-ticketing-server' }
+      headers: { 'X-Client-Info': 'midnight-society-ke-ticketing-server' }
     }
   });
   cachedConfiguration = configuration;

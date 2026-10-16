@@ -1,4 +1,4 @@
--- Ticketing-only operational event journal for the Online Bar Admin live view.
+-- Ticketing-only operational event journal for the Midnight Society KE admin live view.
 -- Apply after TICKETING_CORE_MIGRATION.sql. No customer secrets or QR credentials are recorded.
 
 BEGIN;

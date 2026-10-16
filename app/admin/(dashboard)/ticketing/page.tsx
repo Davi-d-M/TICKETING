@@ -267,7 +267,7 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-black text-white">Ticket tiers</h4>
-            <p className="mt-1 text-xs text-slate-400">Price snapshots and allocations are isolated from Online Bar product inventory.</p>
+            <p className="mt-1 text-xs text-slate-400">Price snapshots and allocations are isolated from bar product inventory.</p>
           </div>
           {event.status === 'draft' || event.status === 'scheduled' ? (
             <div className="flex flex-wrap gap-2">

@@ -119,7 +119,7 @@ export default function Wallet() {
     <main className="min-h-screen bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div className="mx-auto max-w-4xl space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-orange-300/15 bg-gradient-to-br from-[#32172a] via-[#201320] to-[#120e18] p-6 sm:p-8">
-          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">ONLINE BAR · private wallet</p><h1 className="mt-3 text-3xl font-black">Your tickets</h1><p className="mt-2 text-xs text-slate-300">Only share your entry QR with gate staff.</p></div>
+          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">MIDNIGHT SOCIETY KE · private wallet</p><h1 className="mt-3 text-3xl font-black">Your tickets</h1><p className="mt-2 text-xs text-slate-300">Only share your entry QR with gate staff.</p></div>
           {data && <button type="button" onClick={() => void logout()} className="min-h-10 rounded-xl border border-white/15 px-4 text-xs font-bold hover:bg-white/5">Sign out</button>}
         </header>
         {loading && <p role="status" className="rounded-2xl border border-white/10 bg-[#17121e] p-6 text-sm text-slate-300">Loading your secure wallet…</p>}

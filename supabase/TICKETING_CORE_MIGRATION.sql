@@ -1,4 +1,4 @@
--- Isolated Online Bar ticketing schema. Existing commerce tables are untouched.
+-- Isolated Midnight Society KE ticketing schema. Existing commerce tables are untouched.
 -- Apply once to the shared Supabase project before opening the Admin module.
 
 BEGIN;
@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS public.ticketing_organizers (
 );
 
 INSERT INTO public.ticketing_organizers (name, slug, status)
-VALUES ('ONLINE BAR', 'online-bar', 'approved')
-ON CONFLICT (slug) DO NOTHING;
+VALUES ('MIDNIGHT SOCIETY KE', 'midnight-society-ke', 'approved')
+ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name;
 
 CREATE TABLE IF NOT EXISTS public.ticketing_organizer_members (
     organizer_id UUID NOT NULL REFERENCES public.ticketing_organizers(id) ON DELETE RESTRICT,

@@ -165,10 +165,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Enter a valid event title, venue, city and date range. End time must be after start time.' }, { status: 400 });
     }
 
-    const organizerResult = await database.from('ticketing_organizers').select('id').eq('slug', 'online-bar').maybeSingle();
+    const organizerResult = await database.from('ticketing_organizers').select('id').eq('slug', 'midnight-society-ke').maybeSingle();
     if (organizerResult.error || !organizerResult.data) {
       console.error('[TicketingAdmin] Default organizer is unavailable:', organizerResult.error);
-      return NextResponse.json({ error: 'The ONLINE BAR organizer record is unavailable. Apply the ticketing database migration.' }, { status: 503 });
+      return NextResponse.json({ error: 'The Midnight Society KE organizer record is unavailable. Apply the ticketing database migration.' }, { status: 503 });
     }
 
     const slug = `${slugify(title) || 'event'}-${crypto.randomUUID().slice(0, 8)}`;

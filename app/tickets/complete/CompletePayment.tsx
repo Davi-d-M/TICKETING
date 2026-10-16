@@ -56,7 +56,7 @@ export default function CompletePayment({ reference }: { reference: string }) {
   return (
     <main className="min-h-screen bg-[#0d0a12] px-4 py-16 text-white">
       <section className="mx-auto max-w-xl rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 text-center shadow-2xl sm:p-10">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">ONLINE BAR Ticketing</p>
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">Midnight Society KE Ticketing</p>
         <h1 className="mt-4 text-3xl font-black">{loading ? 'Verifying payment…' : result?.success ? 'Your payment is verified' : 'Payment not confirmed yet'}</h1>
         <p className="mt-3 text-sm leading-6 text-slate-300">
           {loading ? 'We’re checking the transaction directly with Paystack. Please keep this page open.' :

@@ -3,6 +3,11 @@
 
 BEGIN;
 
+UPDATE public.ticketing_organizers
+SET name = 'MIDNIGHT SOCIETY KE',
+    slug = 'midnight-society-ke'
+WHERE slug = 'online-bar';
+
 ALTER TABLE public.ticketing_checkins
     ADD COLUMN IF NOT EXISTS request_id UUID,
     ADD COLUMN IF NOT EXISTS staff_email TEXT,

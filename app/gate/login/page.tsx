@@ -32,7 +32,7 @@ export default function GateStaffLoginPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#0d0a12] px-4 py-12 text-white">
       <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 sm:p-9">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">ONLINE BAR · Authorized gate staff</p>
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">MIDNIGHT SOCIETY KE · Authorized gate staff</p>
         <h1 className="mt-4 text-3xl font-black">Gate sign-in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-400">Use the account provided by the ticketing owner. Your scanner only shows events and gates assigned to you.</p>
         <label className="mt-6 block text-xs font-bold text-slate-300">Staff email<input required type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-orange-300" /></label>

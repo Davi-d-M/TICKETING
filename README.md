@@ -1,6 +1,6 @@
-# ONLINE BAR Ticketing module
+# Midnight Society KE Ticketing
 
-This repository is the standalone Next.js host for ONLINE BAR Ticketing. It contains the Halloween-themed public event pages, a password-protected admin workspace, server-side Supabase integration, and Ticketing-only schema migrations.
+This repository is the standalone Next.js host for Midnight Society KE Ticketing. It contains the Halloween-themed public event pages, a password-protected admin workspace, server-side Supabase integration, and ticketing-only schema migrations.
 
 ## Source layout
 

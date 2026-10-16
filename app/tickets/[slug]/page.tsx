@@ -14,10 +14,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const result = await getPublicTicketEvent(slug);
   return {
-    title: result.ok && result.event ? `${result.event.title} | Halloween Tickets` : 'Event Tickets | ONLINE BAR',
+    title: result.ok && result.event ? `${result.event.title} | Halloween Tickets` : 'Event Tickets | Midnight Society KE',
     description: result.ok && result.event
-      ? `${result.event.title} tickets with ONLINE BAR Ticketing.`
-      : 'Explore official ONLINE BAR event tickets.'
+      ? `${result.event.title} tickets with Midnight Society KE Ticketing.`
+      : 'Explore official Midnight Society KE event tickets.'
   };
 }
 
@@ -76,7 +76,7 @@ export default async function TicketEventPage({ params }: PageProps) {
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 -z-10 h-80 w-80 rounded-full bg-orange-500/20 blur-[90px]" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-1/3 -z-10 h-72 w-72 rounded-full bg-violet-500/15 blur-[90px]" />
           <div className="relative max-w-4xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-orange-100"><Ghost size={14} /> Official ONLINE BAR event</div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-orange-100"><Ghost size={14} /> Official Midnight Society KE event</div>
             <p className="mt-7 text-[10px] font-black uppercase tracking-[0.2em] text-orange-200/75">{event.city} · After dark</p>
             <h1 className="mt-2 text-4xl font-black leading-[0.98] tracking-tight sm:text-6xl">{event.title}<span className="text-orange-400">.</span></h1>
             <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-200/80 sm:text-base">{event.description || 'The details are in. Get ready for an unforgettable night.'}</p>
@@ -160,7 +160,7 @@ export default async function TicketEventPage({ params }: PageProps) {
             )}
           </aside>
         </div>
-        <footer className="border-t border-white/[0.08] pt-5 text-center text-[10px] text-slate-500">ONLINE BAR Ticketing · No tricks, no fake confirmations.</footer>
+        <footer className="border-t border-white/[0.08] pt-5 text-center text-[10px] text-slate-500">Midnight Society KE · No tricks, no fake confirmations.</footer>
       </div>
     </main>
   );

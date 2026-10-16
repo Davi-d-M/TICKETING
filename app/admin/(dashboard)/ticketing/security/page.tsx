@@ -207,7 +207,7 @@ export default function TicketingSecurityPage() {
             </Link>
             <div className="mt-6 flex flex-wrap items-start justify-between gap-5">
               <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-orange-200"><ShieldAlert size={14} /> Online Bar · Ticketing Trust</div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-orange-200"><ShieldAlert size={14} /> Midnight Society KE · Ticketing Trust</div>
                 <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">Security command<span className="text-orange-400">.</span></h1>
                 <p className="mt-3 text-sm leading-6 text-slate-300">Ticketing-only incident handling, evidence history and honest release readiness. Security records do not show payment activity or threat detections unless those systems are actually connected.</p>
               </div>

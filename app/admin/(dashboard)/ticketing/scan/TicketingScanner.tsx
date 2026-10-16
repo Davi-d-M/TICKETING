@@ -141,7 +141,7 @@ export default function TicketingScanner({ staffMode = false }: { staffMode?: bo
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="rounded-3xl border border-orange-300/15 bg-gradient-to-br from-[#281626] via-[#1b1221] to-[#120e18] p-6 sm:p-8">
           <Link href={staffMode ? '/gate/scanner' : '/admin/ticketing'} className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={14} /> {staffMode ? 'Gate scanner' : 'Ticketing management'}</Link>
-          <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-orange-200">ONLINE BAR · Gate operations</p>
+          <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-orange-200">MIDNIGHT SOCIETY KE · Gate operations</p>
           <h1 className="mt-2 text-3xl font-black">Ticket scanner</h1>
           <p className="mt-2 text-sm leading-6 text-slate-300">Every scan is validated online against the paid ticket record. The first entry is claimed atomically; retrying after a timeout returns the recorded result.</p>
           {staffMode && <button type="button" onClick={() => { void fetch('/api/ticketing/gate/logout', { method: 'POST' }).then(() => { window.location.assign('/gate/login'); }); }} className="mt-4 min-h-10 rounded-lg border border-white/15 px-3 text-xs font-bold hover:bg-white/5">Sign out</button>}

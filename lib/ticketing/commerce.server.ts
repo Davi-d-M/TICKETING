@@ -331,9 +331,9 @@ export async function sendGuestTicketAccess(orderReference: string, email: strin
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: `ONLINE BAR Tickets <${from}>`,
+      from: `Midnight Society KE Tickets <${from}>`,
       to: [email.trim().toLowerCase()],
-      subject: 'Your ONLINE BAR ticket access link',
+      subject: 'Your Midnight Society KE ticket access link',
       text: `Your payment has been verified. Open this one-time link within 30 minutes to access your tickets: ${claimUrl}`,
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1>Your tickets are ready</h1><p>Payment has been verified. Use the secure, one-time link below within 30 minutes to open your ticket wallet.</p><p><a href="${claimUrl}" style="display:inline-block;background:#fbbf24;color:#211326;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open ticket wallet</a></p><p>If you did not make this purchase, you can ignore this email.</p></div>`
     }),
@@ -370,9 +370,9 @@ export async function sendTransferredTicketAccess(ticketReference: string, email
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: `ONLINE BAR Tickets <${from}>`,
+      from: `Midnight Society KE Tickets <${from}>`,
       to: [email.trim().toLowerCase()],
-      subject: 'Your transferred ONLINE BAR ticket',
+      subject: 'Your transferred Midnight Society KE ticket',
       text: `The ticket transfer has been approved. Ticket reference: ${ticketReference}. Open this one-time link within 30 minutes to access your ticket: ${claimUrl}`,
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1>Your ticket transfer is approved</h1><p>Ticket reference: <strong>${ticketReference}</strong></p><p>Use this secure, one-time link within 30 minutes to open your transferred ticket.</p><p><a href="${claimUrl}" style="display:inline-block;background:#fbbf24;color:#211326;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open transferred ticket</a></p></div>`
     }),
