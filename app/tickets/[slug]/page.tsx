@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock3, Ghost, MapPin, ShieldAlert, ShieldCheck, Ticket } from 'lucide-react';
@@ -73,9 +74,11 @@ export default async function TicketEventPage({ params }: PageProps) {
       <div className="relative mx-auto max-w-6xl space-y-6">
         <Link href="/tickets" className="inline-flex items-center gap-2 text-xs font-bold text-orange-200 transition hover:text-white"><ArrowLeft size={14} /> All events</Link>
         <header className="relative isolate overflow-hidden rounded-[2rem] border border-orange-300/15 bg-gradient-to-br from-[#39172a] via-[#261329] to-[#15101d] p-6 shadow-2xl shadow-black/30 sm:p-10 lg:p-14">
+          {event.cover_image_url && <Image src={event.cover_image_url} alt="" fill sizes="(max-width: 768px) 100vw, 1200px" unoptimized className="object-cover" />}
+          {event.cover_image_url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-[#211326]/90 via-[#261329]/75 to-[#15101d]/90" />}
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 -z-10 h-80 w-80 rounded-full bg-orange-500/20 blur-[90px]" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-1/3 -z-10 h-72 w-72 rounded-full bg-violet-500/15 blur-[90px]" />
-          <div className="relative max-w-4xl">
+          <div className="relative z-10 max-w-4xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/25 bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-orange-100"><Ghost size={14} /> Official Midnight Society KE event</div>
             <p className="mt-7 text-[10px] font-black uppercase tracking-[0.2em] text-orange-200/75">{event.city} · After dark</p>
             <h1 className="mt-2 text-4xl font-black leading-[0.98] tracking-tight sm:text-6xl">{event.title}<span className="text-orange-400">.</span></h1>

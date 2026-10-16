@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import { CalendarDays, ChevronRight, Clock3, Ghost, MapPin, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvents, type PublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
@@ -39,13 +40,15 @@ function EventCard({ event }: { event: PublicTicketEvent }) {
   return (
     <article className="group overflow-hidden rounded-3xl border border-white/10 bg-[#17121e] shadow-xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-orange-300/30 hover:shadow-orange-950/20">
       <div className="relative isolate min-h-56 overflow-hidden bg-gradient-to-br from-[#39172a] via-[#261329] to-[#15101d] p-6">
+        {event.cover_image_url && <Image src={event.cover_image_url} alt="" fill sizes="(max-width: 768px) 100vw, 33vw" unoptimized className="object-cover" />}
+        {event.cover_image_url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-[#120e18] via-black/35 to-black/15" />}
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-14 -z-10 h-56 w-56 rounded-full bg-orange-500/20 blur-[70px]" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 left-1/4 -z-10 h-48 w-48 rounded-full bg-violet-500/15 blur-[70px]" />
-        <div className="flex items-start justify-between gap-3">
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-orange-100"><Ghost size={13} /> After dark</span>
           {event.age_limit !== null && <span className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[10px] font-black text-white/80">{event.age_limit}+</span>}
         </div>
-        <div className="absolute bottom-6 left-6 right-6">
+        <div className="absolute bottom-6 left-6 right-6 z-10">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-200/75">{event.city}</p>
           <h2 className="mt-2 max-w-xl text-2xl font-black tracking-tight text-white sm:text-3xl">{event.title}</h2>
           <p className="mt-2 flex items-center gap-2 text-xs text-white/65"><MapPin size={13} />{event.venue_name}</p>

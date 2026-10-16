@@ -9,6 +9,7 @@ This repository is the standalone Next.js host for Midnight Society KE Ticketing
 - `app/api/admin/ticketing/` — admin-session-protected event management, scanning, transfer review and operations APIs.
 - `app/api/ticketing/` — Paystack checkout, signed webhook, verified payment return, public verification and guest ticket-wallet APIs.
 - `lib/ticketing/` — server-only public listing and payment/guest-wallet services.
+- `app/api/admin/ticketing/events/[eventId]/image/` — authenticated event-photo uploads and replacements.
 - `supabase/` — isolated Ticketing core, security and live-operations schema migrations.
 - `ticketing/README.md` — implementation status, setup notes and release gates.
 - `app/admin/login/` — dedicated Ticketing administrator sign-in.
@@ -33,11 +34,13 @@ After reviewing the SQL and confirming the target Supabase project, apply in thi
 
 1. `supabase/TICKETING_CORE_MIGRATION.sql`
 2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
-3. `supabase/TICKETING_SECURITY_MIGRATION.sql`
-4. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
-5. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
+3. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
+4. `supabase/TICKETING_SECURITY_MIGRATION.sql`
+5. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
+6. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 
 The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
+Admins can upload or replace JPEG, PNG and WebP event photos (up to 4 MB) from the event form or event card. The bucket is public-read-only; uploads require the admin session and server-side Supabase service role. Apply the event-images migration before uploading.
 
 The Live Operations view reads committed operational changes from an append-only, allowlisted database journal. It polls the protected API every five seconds and recovers using an event cursor; it is not a push/WebSocket connection or an external security log. It deliberately omits buyer contact details, payment payloads and ticket credential hashes.
 
@@ -56,4 +59,4 @@ The site shell and browse-only pages work without environment variables; databas
 
 ## Sales stay disabled until release approval
 
-Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and online assigned gate-staff scanning are implemented. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all five migrations, configure payment/email/session/encryption secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission, rotating QR codes and a native Android wallet are not implemented.
+Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and online assigned gate-staff scanning are implemented. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all six migrations, configure payment/email/session/encryption secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission, rotating QR codes and a native Android wallet are not implemented.

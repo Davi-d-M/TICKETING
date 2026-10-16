@@ -21,9 +21,12 @@ Review all SQL files and confirm the target Supabase project before applying the
 
 1. `supabase/TICKETING_CORE_MIGRATION.sql`
 2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
-3. `supabase/TICKETING_SECURITY_MIGRATION.sql`
-4. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
-5. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
+3. `supabase/TICKETING_EVENT_IMAGES_MIGRATION.sql`
+4. `supabase/TICKETING_SECURITY_MIGRATION.sql`
+5. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
+6. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
+
+The event-images migration creates a public-read-only bucket for JPEG, PNG and WebP artwork. Authenticated admin uploads are sent through the server-side API and limited to 4 MB. Apply it before using event photo uploads.
 
 The commerce migration extends the core schema and replaces gate check-in logic to reject cancelled, postponed, completed or out-of-window events. The verification migration adds assigned staff, scan retry IDs, rate limits, public verification, operations metrics and approval-based transfers. It uses only `ticketing_*` objects, enables RLS on new tables, revokes browser-role access and grants server-side access to `service_role`. Do not enable sales unless every migration has completed successfully.
 

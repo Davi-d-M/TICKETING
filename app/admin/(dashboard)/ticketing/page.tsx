@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -11,6 +12,7 @@ import {
   Clock3,
   Fingerprint,
   Ghost,
+  ImagePlus,
   KeyRound,
   MapPin,
   Plus,
@@ -51,6 +53,7 @@ type TicketEvent = {
   ends_at: string;
   age_limit: number | null;
   capacity: number | null;
+  cover_image_url: string | null;
   status: string;
   created_at: string;
   ticket_types: TicketType[];
@@ -82,12 +85,12 @@ function statusLabel(status: string) {
 }
 
 async function readResponse(response: Response) {
-  const result = await response.json().catch(() => ({})) as { error?: string };
+  const result = await response.json().catch(() => ({})) as { error?: string; event?: { id?: string } };
   if (!response.ok) throw new Error(result.error || `Ticketing request failed (${response.status}).`);
   return result;
 }
 
-function EventForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+function EventForm({ onCreated, onCancel }: { onCreated: (notice?: string) => void; onCancel: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -95,7 +98,7 @@ function EventForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: (
     setSaving(true);
     setError('');
     try {
-      await readResponse(await fetch('/api/admin/ticketing', {
+      const created = await readResponse(await fetch('/api/admin/ticketing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,6 +116,24 @@ function EventForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: (
           cancellationPolicy: formData.get('cancellationPolicy')
         })
       }));
+      const photo = formData.get('coverImage');
+      if (photo instanceof File && photo.size > 0) {
+        if (!created.event?.id) {
+          onCreated('Event draft created, but its photo could not be attached. Retry from the event card.');
+          return;
+        }
+        const upload = new FormData();
+        upload.set('photo', photo);
+        try {
+          await readResponse(await fetch(`/api/admin/ticketing/events/${created.event.id}/image`, {
+            method: 'POST',
+            body: upload
+          }));
+        } catch (cause) {
+          onCreated(`Event draft created, but its photo was not uploaded. Retry from the event card. ${cause instanceof Error ? cause.message : ''}`);
+          return;
+        }
+      }
       onCreated();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The event could not be saved.');
@@ -140,6 +161,7 @@ function EventForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: (
         <label className={labelClass}>Doors open (optional)<input className={inputClass} name="doorsOpenAt" type="datetime-local" /></label>
         <label className={labelClass}>Capacity (optional)<input className={inputClass} name="capacity" type="number" min="1" max="1000000" placeholder="Set venue limit" /></label>
         <label className={labelClass}>Minimum age (optional)<input className={inputClass} name="ageLimit" type="number" min="0" max="120" placeholder="No restriction" /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Event photo (optional)<input className={inputClass} name="coverImage" type="file" accept="image/jpeg,image/png,image/webp" /><span className="mt-1 block text-[10px] font-normal text-slate-500">JPEG, PNG or WebP, up to 4 MB. Shown on the public event listing.</span></label>
         <label className={`${labelClass} sm:col-span-2`}>Event description<textarea className={`${inputClass} min-h-24 py-3`} name="description" maxLength={10000} placeholder="Tell guests what the event is about." /></label>
         <label className={`${labelClass} sm:col-span-2`}>Cancellation policy<textarea className={`${inputClass} min-h-20 py-3`} name="cancellationPolicy" maxLength={5000} placeholder="Add the event refund and cancellation terms before publishing." /></label>
       </div>
@@ -219,6 +241,8 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
   const [addingTier, setAddingTier] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState('');
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const allocated = event.ticket_types.reduce((total, tier) => total + tier.capacity, 0);
   async function setStatus(status: 'scheduled' | 'on_sale') {
     setStatusSaving(true);
@@ -238,25 +262,55 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
       setStatusSaving(false);
     }
   }
+  async function uploadPhoto(file: File) {
+    setPhotoSaving(true);
+    setPhotoError('');
+    try {
+      const form = new FormData();
+      form.set('photo', file);
+      await readResponse(await fetch(`/api/admin/ticketing/events/${event.id}/image`, {
+        method: 'POST',
+        body: form
+      }));
+      onRefresh();
+    } catch (cause) {
+      setPhotoError(cause instanceof Error ? cause.message : 'Event photo could not be uploaded.');
+    } finally {
+      setPhotoSaving(false);
+    }
+  }
   return (
     <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#17121e] shadow-xl shadow-black/20">
-      <div className="border-b border-white/10 bg-gradient-to-r from-[#211326] via-[#251526] to-[#17121e] p-5 text-white sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-orange-300/30 bg-orange-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-200">{statusLabel(event.status)}</span>
-              {event.age_limit !== null && <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/80">{event.age_limit}+</span>}
+      <div className="relative isolate overflow-hidden border-b border-white/10 bg-gradient-to-r from-[#211326] via-[#251526] to-[#17121e] p-5 text-white sm:p-6">
+        {event.cover_image_url && <Image src={event.cover_image_url} alt="" fill sizes="(max-width: 768px) 100vw, 1200px" unoptimized className="object-cover opacity-25" />}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#17121e]/90 via-[#211326]/75 to-[#17121e]/70" />
+        <div className="relative z-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-orange-300/30 bg-orange-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-200">{statusLabel(event.status)}</span>
+                {event.age_limit !== null && <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/80">{event.age_limit}+</span>}
+              </div>
+              <h3 className="text-xl font-black tracking-tight sm:text-2xl">{event.title}</h3>
+              <p className="mt-2 flex items-center gap-2 text-sm text-white/70"><MapPin size={14} />{event.venue_name} · {event.city}</p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-white/60"><CalendarDays size={13} />{eventDate(event.starts_at)}</p>
             </div>
-            <h3 className="text-xl font-black tracking-tight sm:text-2xl">{event.title}</h3>
-            <p className="mt-2 flex items-center gap-2 text-sm text-white/70"><MapPin size={14} />{event.venue_name} · {event.city}</p>
-            <p className="mt-1 flex items-center gap-2 text-xs text-white/60"><CalendarDays size={13} />{eventDate(event.starts_at)}</p>
+            <div className="rounded-xl border border-orange-300/15 bg-orange-300/5 px-4 py-3 text-right">
+              <p className="text-2xl font-black">{event.ticket_types.length}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100/60">Ticket tiers</p>
+            </div>
           </div>
-          <div className="rounded-xl border border-orange-300/15 bg-orange-300/5 px-4 py-3 text-right">
-            <p className="text-2xl font-black">{event.ticket_types.length}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-100/60">Ticket tiers</p>
-          </div>
+          {event.description && <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{event.description}</p>}
+          <label className="mt-4 inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-orange-200/20 bg-black/20 px-3 text-xs font-bold text-orange-100 hover:bg-black/30">
+            <ImagePlus size={14} />{photoSaving ? 'Uploading photo…' : event.cover_image_url ? 'Replace event photo' : 'Upload event photo'}
+            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={photoSaving} onChange={change => {
+              const file = change.currentTarget.files?.[0];
+              change.currentTarget.value = '';
+              if (file) void uploadPhoto(file);
+            }} />
+          </label>
+          {photoError && <p role="alert" className="mt-2 text-xs text-red-200">{photoError}</p>}
         </div>
-        {event.description && <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{event.description}</p>}
       </div>
       <div className="p-5 sm:p-6">
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -304,6 +358,7 @@ export default function TicketingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addingEvent, setAddingEvent] = useState(false);
+  const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
@@ -392,7 +447,8 @@ export default function TicketingPage() {
           <Feature icon={Users} title="Admin-only workspace" body="Ticket administration is restricted to platform owners and admins." />
         </section>
 
-        {addingEvent && <EventForm onCancel={() => setAddingEvent(false)} onCreated={() => { setAddingEvent(false); void load(); }} />}
+        {notice && <p role="status" className="rounded-xl border border-orange-300/20 bg-orange-300/10 p-3 text-sm text-orange-100">{notice}</p>}
+        {addingEvent && <EventForm onCancel={() => setAddingEvent(false)} onCreated={message => { setAddingEvent(false); setNotice(message || 'Event draft created.'); void load(); }} />}
 
         <section className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
