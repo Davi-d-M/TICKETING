@@ -73,6 +73,7 @@ export async function isTicketingSalesReady() {
     && Boolean(emailFrom && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFrom))
     && validPublicUrl
     && Boolean((process.env.TICKETING_GUEST_SESSION_SECRET?.trim().length || 0) >= 32)
+    && Boolean((process.env.TICKETING_GATE_SESSION_SECRET?.trim().length || 0) >= 32)
     && Boolean((process.env.TICKETING_TICKET_ENCRYPTION_KEY?.trim().length || 0) >= 32)
     && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim())
     && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
@@ -83,7 +84,8 @@ export async function isTicketingSalesReady() {
   const migrationChecks = await Promise.all([
     database.from('ticketing_payment_attempts').select('checkout_url').limit(0),
     database.from('ticketing_tickets').select('credential_ciphertext').limit(0),
-    database.from('ticketing_guest_access_links').select('id').limit(0)
+    database.from('ticketing_guest_access_links').select('id').limit(0),
+    database.from('ticketing_gate_staff_assignments').select('event_id').limit(0)
   ]);
   const migrationError = migrationChecks.find(check => check.error)?.error;
   if (migrationError) {
@@ -263,11 +265,12 @@ function signGuestSession(payload: string) {
   return createHmac('sha256', guestSecret()).update(payload).digest('base64url');
 }
 
-export function createGuestSession(orderId: string, email: string, now = Date.now()) {
+export function createGuestSession(orderId: string, email: string, now = Date.now(), ticketId?: string) {
   const payload = Buffer.from(JSON.stringify({
     orderId,
     email: email.trim().toLowerCase(),
-    expiresAt: Math.floor(now / 1000) + 30 * 24 * 60 * 60
+    expiresAt: Math.floor(now / 1000) + 30 * 24 * 60 * 60,
+    ticketId
   })).toString('base64url');
   return `${payload}.${signGuestSession(payload)}`;
 }
@@ -285,12 +288,18 @@ export function readGuestSession(value: string | undefined) {
       orderId?: unknown;
       email?: unknown;
       expiresAt?: unknown;
+      ticketId?: unknown;
     };
     if (typeof decoded.orderId !== 'string'
       || typeof decoded.email !== 'string'
       || typeof decoded.expiresAt !== 'number'
+      || (decoded.ticketId !== undefined && typeof decoded.ticketId !== 'string')
       || decoded.expiresAt <= Math.floor(Date.now() / 1000)) return null;
-    return { orderId: decoded.orderId, email: decoded.email };
+    return {
+      orderId: decoded.orderId,
+      email: decoded.email,
+      ticketId: typeof decoded.ticketId === 'string' ? decoded.ticketId : undefined
+    };
   } catch {
     return null;
   }
@@ -333,5 +342,44 @@ export async function sendGuestTicketAccess(orderReference: string, email: strin
   if (!response.ok) {
     console.error('[TicketingEmail] Guest ticket access delivery returned HTTP', response.status);
     throw new Error('The payment was verified, but ticket access email could not be delivered. Request a new access link.');
+  }
+}
+
+export async function sendTransferredTicketAccess(ticketReference: string, email: string) {
+  const database = createServerSupabaseClient();
+  if (!database) throw new Error('Ticketing database access is not configured.');
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const { data, error } = await database.rpc('ticketing_create_transfer_access_link', {
+    p_ticket_reference: ticketReference,
+    p_email: email.trim().toLowerCase(),
+    p_token_hash: tokenHash
+  });
+  if (error) throw error;
+  const result = data as { created?: boolean; rate_limited?: boolean } | null;
+  if (!result?.created) {
+    if (result?.rate_limited) throw new Error('Too many ticket access emails were requested. Please try again later.');
+    throw new Error('No approved transferred ticket matches those details.');
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!from || !apiKey) throw new Error('Guest ticket email delivery is not configured.');
+  const claimUrl = `${process.env.TICKETING_PUBLIC_URL!.replace(/\/$/, '')}/tickets/claim?token=${encodeURIComponent(token)}`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: `ONLINE BAR Tickets <${from}>`,
+      to: [email.trim().toLowerCase()],
+      subject: 'Your transferred ONLINE BAR ticket',
+      text: `The ticket transfer has been approved. Ticket reference: ${ticketReference}. Open this one-time link within 30 minutes to access your ticket: ${claimUrl}`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1>Your ticket transfer is approved</h1><p>Ticket reference: <strong>${ticketReference}</strong></p><p>Use this secure, one-time link within 30 minutes to open your transferred ticket.</p><p><a href="${claimUrl}" style="display:inline-block;background:#fbbf24;color:#211326;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open transferred ticket</a></p></div>`
+    }),
+    cache: 'no-store'
+  });
+  if (!response.ok) {
+    console.error('[TicketingEmail] Transferred ticket access delivery returned HTTP', response.status);
+    throw new Error('The transfer is approved, but ticket access email could not be delivered. Request a new access link.');
   }
 }

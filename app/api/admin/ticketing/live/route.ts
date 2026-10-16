@@ -65,26 +65,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(feed, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   }
 
-  const [onSaleEvents, issuedTickets, admittedTickets, paidOrders, openPayments, activeReservations, successfulScans, rejectedScans, pendingRefunds] = await Promise.all([
-    database.from('ticketing_events').select('id', { count: 'exact', head: true }).eq('status', 'on_sale'),
-    database.from('ticketing_tickets').select('id', { count: 'exact', head: true }).in('status', ['issued', 'checked_in']),
-    database.from('ticketing_tickets').select('id', { count: 'exact', head: true }).eq('status', 'checked_in'),
-    database.from('ticketing_orders').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
-    database.from('ticketing_payment_attempts').select('id', { count: 'exact', head: true }).in('status', ['pending', 'unknown', 'reconciliation_required']),
-    database.from('ticketing_reservations').select('id', { count: 'exact', head: true }).eq('status', 'reserved').gt('expires_at', new Date().toISOString()),
-    database.from('ticketing_checkins').select('id', { count: 'exact', head: true }).eq('result', 'accepted'),
-    database.from('ticketing_checkins').select('id', { count: 'exact', head: true }).in('result', ['already_used', 'invalid', 'refunded', 'revoked', 'wrong_event']),
-    database.from('ticketing_refunds').select('id', { count: 'exact', head: true }).in('status', ['requested', 'approved', 'processing', 'reconciliation_required'])
-  ]);
-  const metricResults = [
-    onSaleEvents, issuedTickets, admittedTickets, paidOrders, openPayments,
-    activeReservations, successfulScans, rejectedScans, pendingRefunds
-  ];
-  const metricError = metricResults.find(result => result.error)?.error;
-  if (metricError) {
-    if (isMissingMigration(metricError)) {
+  const { data: metricData, error: metricError } = await database.rpc('ticketing_get_security_metrics');
+  if (metricError || !metricData) {
+    if (metricError && isMissingMigration(metricError)) {
       return NextResponse.json({
-        error: 'Apply supabase/TICKETING_CORE_MIGRATION.sql and supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql to enable Ticketing operations.'
+        error: 'Apply supabase/TICKETING_VERIFICATION_MIGRATION.sql after the core, commerce, security and live operations migrations to enable security metrics.'
       }, { status: 503 });
     }
     console.error('[TicketingLive] Could not load operational metrics:', metricError);
@@ -93,16 +78,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ...feed,
-    metrics: {
-      onSaleEvents: onSaleEvents.count || 0,
-      validTickets: issuedTickets.count || 0,
-      admittedTickets: admittedTickets.count || 0,
-      paidOrders: paidOrders.count || 0,
-      unresolvedPayments: openPayments.count || 0,
-      activeReservations: activeReservations.count || 0,
-      successfulScans: successfulScans.count || 0,
-      rejectedScans: rejectedScans.count || 0,
-      pendingRefunds: pendingRefunds.count || 0
-    }
+    metrics: metricData
   }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
 }

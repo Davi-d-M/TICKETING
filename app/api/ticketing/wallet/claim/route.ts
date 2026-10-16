@@ -33,14 +33,14 @@ export async function POST(request: Request) {
     console.error('[TicketingWallet] Could not validate guest access link:', error);
     return NextResponse.json({ error: 'Ticket access could not be verified.' }, { status: 503 });
   }
-  const claim = data as { order_id?: string; buyer_email?: string } | null;
+  const claim = data as { order_id?: string; buyer_email?: string; ticket_id?: string | null } | null;
   if (!claim?.order_id || !claim.buyer_email) {
     return NextResponse.json({ error: 'This ticket access link is invalid, expired or already used.' }, { status: 410 });
   }
 
   let session: string;
   try {
-    session = createGuestSession(claim.order_id, claim.buyer_email);
+    session = createGuestSession(claim.order_id, claim.buyer_email, Date.now(), claim.ticket_id || undefined);
   } catch (cause) {
     console.error('[TicketingWallet] Guest session signing is not configured:', cause);
     return NextResponse.json({ error: 'Guest ticket access is not configured.' }, { status: 503 });

@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 export default function RequestAccess() {
   const [reference, setReference] = useState('');
+  const [referenceType, setReferenceType] = useState<'order' | 'transfer'>('order');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,11 @@ export default function RequestAccess() {
       const response = await fetch('/api/ticketing/wallet/send-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderReference: reference.trim().toUpperCase(), email: email.trim().toLowerCase() })
+        body: JSON.stringify({
+          orderReference: referenceType === 'order' ? reference.trim().toUpperCase() : '',
+          ticketReference: referenceType === 'transfer' ? reference.trim().toUpperCase() : '',
+          email: email.trim().toLowerCase()
+        })
       });
       const result = await response.json() as { message?: string; error?: string };
       if (!response.ok) throw new Error(result.error || 'Could not request a ticket access link.');
@@ -34,9 +39,10 @@ export default function RequestAccess() {
       <form onSubmit={submit} className="mx-auto max-w-lg rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 sm:p-9">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">Secure guest recovery</p>
         <h1 className="mt-4 text-3xl font-black">Find your tickets</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">Enter the order reference and email used for purchase. We’ll send a one-time wallet link if they match a paid order.</p>
-        <label className="mt-6 block text-xs font-bold text-slate-300">Order reference<input required maxLength={80} value={reference} onChange={event => setReference(event.target.value)} placeholder="OBT-XXXXXXXXXXXX" className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-orange-300" /></label>
-        <label className="mt-4 block text-xs font-bold text-slate-300">Purchase email<input required type="email" maxLength={320} autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-orange-300" /></label>
+        <p className="mt-3 text-sm leading-6 text-slate-300">Request a one-time wallet link using your purchase details or an approved transfer ticket.</p>
+        <label className="mt-6 block text-xs font-bold text-slate-300">Access type<select value={referenceType} onChange={event => setReferenceType(event.target.value === 'transfer' ? 'transfer' : 'order')} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white"><option value="order">Original purchase</option><option value="transfer">Approved ticket transfer</option></select></label>
+        <label className="mt-4 block text-xs font-bold text-slate-300">{referenceType === 'order' ? 'Order reference' : 'Transferred ticket reference'}<input required maxLength={32} value={reference} onChange={event => setReference(event.target.value)} placeholder="OBT-XXXXXXXXXXXX" className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-orange-300" /></label>
+        <label className="mt-4 block text-xs font-bold text-slate-300">{referenceType === 'order' ? 'Purchase email' : 'Recipient email'}<input required type="email" maxLength={320} autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-orange-300" /></label>
         <button disabled={loading} className="mt-5 min-h-11 w-full rounded-xl bg-orange-400 px-5 text-sm font-black text-[#170d18] disabled:opacity-50">{loading ? 'Checking…' : 'Email secure access link'}</button>
         {message && <p role="status" className="mt-4 text-xs leading-5 text-slate-300">{message}</p>}
         <Link href="/tickets" className="mt-6 inline-block text-xs font-bold text-orange-200">Back to events</Link>

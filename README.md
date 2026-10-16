@@ -5,9 +5,9 @@ This repository is the standalone Next.js host for ONLINE BAR Ticketing. It cont
 ## Source layout
 
 - `app/tickets/` — Halloween-themed public event discovery and event-detail/ticket-options pages.
-- `app/admin/(dashboard)/ticketing/` — owner/admin event management, trust centre, live operations and the platform-admin gate scanner.
-- `app/api/admin/ticketing/` — admin-session-protected event management, scanning and operations APIs.
-- `app/api/ticketing/` — Paystack checkout, signed webhook, verified payment return and guest ticket-wallet APIs.
+- `app/admin/(dashboard)/ticketing/` — owner/admin event management, trust centre, live operations, transfer review and gate scanners.
+- `app/api/admin/ticketing/` — admin-session-protected event management, scanning, transfer review and operations APIs.
+- `app/api/ticketing/` — Paystack checkout, signed webhook, verified payment return, public verification and guest ticket-wallet APIs.
 - `lib/ticketing/` — server-only public listing and payment/guest-wallet services.
 - `supabase/` — isolated Ticketing core, security and live-operations schema migrations.
 - `ticketing/README.md` — implementation status, setup notes and release gates.
@@ -35,10 +35,13 @@ After reviewing the SQL and confirming the target Supabase project, apply in thi
 2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
 3. `supabase/TICKETING_SECURITY_MIGRATION.sql`
 4. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
+5. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 
 The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
 
 The Live Operations view reads committed operational changes from an append-only, allowlisted database journal. It polls the protected API every five seconds and recovers using an event cursor; it is not a push/WebSocket connection or an external security log. It deliberately omits buyer contact details, payment payloads and ticket credential hashes.
+
+The verification migration adds safe customer verification, event-and-gate-assigned staff accounts, rate limits, atomic scan retry protection, security metrics and owner-approved ticket transfers.
 
 ## Local development
 
@@ -53,4 +56,4 @@ The site shell and browse-only pages work without environment variables; databas
 
 ## Sales stay disabled until release approval
 
-Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and an online platform-admin scanner are implemented. Live purchases remain disabled by default: apply and test all four migrations, configure sandbox/email/guest secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Refunds, transfers, event-scoped staff scanning, offline admission, rotating QR codes and a native Android wallet are not implemented.
+Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance and online assigned gate-staff scanning are implemented. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all five migrations, configure payment/email/session/encryption secrets, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission, rotating QR codes and a native Android wallet are not implemented.

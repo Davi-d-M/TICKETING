@@ -34,15 +34,34 @@ type LiveEvent = {
 };
 
 type Metrics = {
-  onSaleEvents: number;
-  validTickets: number;
-  admittedTickets: number;
-  paidOrders: number;
-  unresolvedPayments: number;
-  activeReservations: number;
-  successfulScans: number;
-  rejectedScans: number;
-  pendingRefunds: number;
+  on_sale_events: number;
+  paid_orders: number;
+  tickets_expected: number;
+  tickets_issued: number;
+  ticket_capacity: number;
+  active_capacity: number;
+  available_inventory: number;
+  active_reservations: number;
+  successful_callbacks: number;
+  failed_callbacks: number;
+  unresolved_payments: number;
+  pending_refunds: number;
+  accepted_entries: number;
+  rejected_scans: number;
+  refunded_scans: number;
+  revoked_scans: number;
+  active_scanners: number;
+  last_scanner_sync: string | null;
+  repeated_across_gates: number;
+  recent_scans: Array<{
+    id: number;
+    scanned_at: string;
+    result: string;
+    gate_name: string;
+    staff_email: string | null;
+    ticket_reference: string;
+    event_title: string;
+  }>;
 };
 
 type LiveResponse = {
@@ -106,6 +125,7 @@ async function readLiveData(url: string): Promise<LiveResponse> {
 export default function TicketingLivePage() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [metricsSampledAt, setMetricsSampledAt] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -134,7 +154,10 @@ export default function TicketingLivePage() {
         setEvents(current => [...newEvents].reverse().concat(current).slice(0, 100));
       }
       cursor.current = data.nextCursor;
-      if (data.metrics) setMetrics(data.metrics);
+      if (data.metrics) {
+        setMetrics(data.metrics);
+        setMetricsSampledAt(data.sampledAt);
+      }
       setLastUpdated(data.sampledAt);
       setError('');
     } catch (cause) {
@@ -168,15 +191,21 @@ export default function TicketingLivePage() {
     void poll(true);
   }
 
+  const staleMetrics = !metricsSampledAt || Date.now() - new Date(metricsSampledAt).getTime() > 60_000;
   const cards = [
-    { icon: CalendarDays, label: 'Events on sale', value: metrics?.onSaleEvents, hint: 'Currently marked on sale' },
-    { icon: Ticket, label: 'Valid tickets', value: metrics?.validTickets, hint: 'Issued and not refunded/revoked' },
-    { icon: Wallet, label: 'Paid orders', value: metrics?.paidOrders, hint: 'Order state verified as paid', tone: 'violet' as const },
-    { icon: ScanLine, label: 'Successful admissions', value: metrics?.successfulScans, hint: 'Accepted gate scans', tone: 'violet' as const },
-    { icon: AlertTriangle, label: 'Unresolved payments', value: metrics?.unresolvedPayments, hint: 'Pending, unknown or reconciliation', tone: 'red' as const },
-    { icon: Clock3, label: 'Active reservations', value: metrics?.activeReservations, hint: 'Unexpired reserved inventory' },
-    { icon: ShieldCheck, label: 'Rejected scans', value: metrics?.rejectedScans, hint: 'Duplicate or invalid scan outcomes', tone: 'red' as const },
-    { icon: Activity, label: 'Refunds to review', value: metrics?.pendingRefunds, hint: 'Requested, processing or reconciliation', tone: 'violet' as const }
+    { icon: CalendarDays, label: 'Events on sale', value: metrics?.on_sale_events, hint: 'Current event state' },
+    { icon: Wallet, label: 'Paid orders', value: metrics?.paid_orders, hint: 'Payment state confirmed', tone: 'violet' as const },
+    { icon: Ticket, label: 'Tickets issued', value: metrics?.tickets_issued, hint: `${number(metrics?.tickets_expected)} expected for paid orders` },
+    { icon: Ticket, label: 'Available inventory', value: metrics?.available_inventory, hint: `${number(metrics?.active_capacity)} active capacity · ${number(metrics?.active_reservations)} reserved` },
+    { icon: ShieldCheck, label: 'Successful callbacks', value: metrics?.successful_callbacks, hint: 'Deduplicated provider callbacks', tone: 'violet' as const },
+    { icon: AlertTriangle, label: 'Failed callbacks', value: metrics?.failed_callbacks, hint: 'Rejected or retry-required', tone: 'red' as const },
+    { icon: ScanLine, label: 'Accepted entries', value: metrics?.accepted_entries, hint: 'Committed first-entry records', tone: 'violet' as const },
+    { icon: ShieldCheck, label: 'Rejected scans', value: metrics?.rejected_scans, hint: 'Includes duplicates; not proof of fraud', tone: 'red' as const },
+    { icon: Ticket, label: 'Refunded / revoked scans', value: (metrics?.refunded_scans || 0) + (metrics?.revoked_scans || 0), hint: `${number(metrics?.refunded_scans)} refunded · ${number(metrics?.revoked_scans)} revoked`, tone: 'red' as const },
+    { icon: Radio, label: 'Active scanners', value: metrics?.active_scanners, hint: `Last sync: ${metrics?.last_scanner_sync ? timestamp(metrics.last_scanner_sync) : 'none recorded'}` },
+    { icon: AlertTriangle, label: 'Scanned at multiple gates', value: metrics?.repeated_across_gates, hint: 'Last 24 hours; investigate, not automatic fraud', tone: 'red' as const },
+    { icon: Activity, label: 'Refunds to review', value: metrics?.pending_refunds, hint: 'Requested, processing or reconciliation', tone: 'violet' as const },
+    { icon: Clock3, label: 'Unresolved payments', value: metrics?.unresolved_payments, hint: 'Pending, unknown or reconciliation', tone: 'red' as const }
   ];
 
   return (
@@ -199,6 +228,7 @@ export default function TicketingLivePage() {
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
             <span className="inline-flex items-center gap-2 text-emerald-200"><Radio size={14} className={error ? 'text-red-300' : 'animate-pulse'} /> {error ? 'Feed disconnected' : 'Feed every 5s · metrics every 30s'}</span>
             <span className="text-slate-400">Last successful check: {lastUpdated ? timestamp(lastUpdated) : 'Waiting for first check'}</span>
+            <span className={staleMetrics ? 'font-bold text-amber-200' : 'font-bold text-emerald-200'}>Metrics {staleMetrics ? 'STALE' : 'LIVE'} · {metricsSampledAt ? timestamp(metricsSampledAt) : 'not sampled'}</span>
             <span className="text-slate-500">Database polling, not a push/WebSocket connection</span>
           </div>
         </header>
@@ -207,6 +237,27 @@ export default function TicketingLivePage() {
 
         <section aria-label="Current ticket operations metrics" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map(card => <MetricCard key={card.label} {...card} />)}
+        </section>
+
+        <section className="overflow-hidden rounded-3xl border border-orange-300/15 bg-[#17121e]">
+          <div className="border-b border-white/10 p-5 sm:p-6">
+            <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-orange-200"><ScanLine size={14} /> Append-only check-in audit</div>
+            <h2 className="mt-2 text-xl font-black">Recent gate decisions</h2>
+            <p className="mt-1 text-xs text-slate-400">Latest 50 database records, including staff and gate. Rejected attempts are not by themselves proof of fraud.</p>
+          </div>
+          {metrics?.recent_scans?.length ? (
+            <ol className="max-h-[34rem] divide-y divide-white/[0.07] overflow-y-auto">
+              {metrics.recent_scans.map(scan => (
+                <li key={scan.id} className="grid gap-2 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-bold text-white">{scan.event_title} · {scan.result.replaceAll('_', ' ')}</p>
+                    <p className="mt-1 break-all text-[10px] text-slate-400">{scan.ticket_reference || 'Unknown credential'} · {scan.staff_email || 'Staff identity unavailable'} · {scan.gate_name || 'Gate unspecified'}</p>
+                  </div>
+                  <time className="text-[10px] text-slate-500 sm:text-right" dateTime={scan.scanned_at}>{timestamp(scan.scanned_at)}</time>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="p-6 text-sm text-slate-400">No check-in scans have been recorded.</p>}
         </section>
 
         <section className="overflow-hidden rounded-3xl border border-violet-300/15 bg-gradient-to-br from-[#1a1421] to-[#120f18] shadow-xl shadow-black/20">
@@ -248,7 +299,7 @@ export default function TicketingLivePage() {
 
         <aside className="rounded-2xl border border-orange-300/15 bg-orange-300/[0.04] p-4 text-xs leading-5 text-orange-50/70">
           <p className="font-black text-orange-100">Current release limits</p>
-          <p className="mt-1">Checkout, provider-verified payment callbacks, ticket wallet/QR issuance and authorized gate scanning are not active in this build. Metrics show stored database records only; zero counts do not mean a live payment or scan system has been verified. Web browsers cannot reliably detect screenshots. Android ticket-wallet screenshot protection remains dependent on the native wallet screen, which has not been built yet.</p>
+          <p className="mt-1">Metrics are database snapshots and can be stale when the migration or database is unavailable. Repeated scans are investigation signals, not proof of fraud. Gate admission requires an online server response; offline scans are never shown as verified. Staff assignment and scan history are auditable, but transfers and refunds still need their own approved workflows.</p>
         </aside>
       </div>
     </main>

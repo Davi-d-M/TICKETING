@@ -7,6 +7,16 @@ import { decryptTicketCredential, readGuestSession } from '@/lib/ticketing/comme
 export const dynamic = 'force-dynamic';
 
 const guestCookieName = process.env.NODE_ENV === 'production' ? '__Host-ticketing-guest' : 'ticketing-guest';
+type TicketOrder = {
+  id: string;
+  reference: string;
+  buyer_email: string;
+  buyer_name: string;
+  total_minor: number;
+  currency: string;
+  paid_at: string | null;
+  event_id: string;
+};
 
 export async function GET() {
   const cookie = (await cookies()).get(guestCookieName)?.value;
@@ -22,18 +32,21 @@ export async function GET() {
 
   const database = createServerSupabaseClient();
   if (!database) return NextResponse.json({ error: 'Ticketing storage is not configured.' }, { status: 503 });
-  const { data: order, error: orderError } = await database
+  const { data: orderData, error: orderError } = await database
     .from('ticketing_orders')
     .select('id,reference,buyer_email,buyer_name,total_minor,currency,paid_at,event_id,status')
     .eq('id', session.orderId)
-    .eq('buyer_email', session.email)
     .eq('status', 'paid')
     .maybeSingle();
   if (orderError) {
     console.error('[TicketingWallet] Could not load guest order:', orderError);
     return NextResponse.json({ error: 'Ticket wallet could not be loaded.' }, { status: 503 });
   }
+  const order = orderData as unknown as TicketOrder | null;
   if (!order) return NextResponse.json({ error: 'No paid ticket order is available for this wallet.' }, { status: 404 });
+  if (!session.ticketId && order.buyer_email.toLowerCase() !== session.email.toLowerCase()) {
+    return NextResponse.json({ error: 'No paid ticket order is available for this wallet.' }, { status: 404 });
+  }
 
   const { data: event, error: eventError } = await database
     .from('ticketing_events')
@@ -55,15 +68,18 @@ export async function GET() {
   }
 
   const itemIds = (items || []).map(item => item.id);
-  const ticketsResult = itemIds.length
-    ? await database.from('ticketing_tickets')
-      .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_ciphertext')
-      .in('order_item_id', itemIds)
-      .order('issued_at', { ascending: true })
-    : { data: [], error: null };
+  let walletTicketsQuery = database.from('ticketing_tickets')
+    .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_ciphertext,attendee_name,attendee_email')
+    .in('order_item_id', itemIds)
+    .order('issued_at', { ascending: true });
+  if (session.ticketId) walletTicketsQuery = walletTicketsQuery.eq('id', session.ticketId).eq('attendee_email', session.email);
+  const ticketsResult = itemIds.length ? await walletTicketsQuery : { data: [], error: null };
   if (ticketsResult.error) {
     console.error('[TicketingWallet] Could not load issued tickets:', ticketsResult.error);
     return NextResponse.json({ error: 'Issued tickets could not be loaded.' }, { status: 503 });
+  }
+  if (session.ticketId && !(ticketsResult.data || []).length) {
+    return NextResponse.json({ error: 'This transferred ticket is no longer active in the wallet.' }, { status: 404 });
   }
 
   try {
@@ -75,12 +91,19 @@ export async function GET() {
       itemsById.set(item.id, item.ticket_name_snapshot);
     }
     const tickets = (ticketsResult.data || []).map(ticket => {
-      if (typeof ticket.credential_ciphertext !== 'string' || !ticket.credential_ciphertext
-        || typeof ticket.ticket_reference !== 'string'
+      if (typeof ticket.ticket_reference !== 'string'
         || typeof ticket.status !== 'string'
         || typeof ticket.issued_at !== 'string'
-        || typeof ticket.order_item_id !== 'string') {
+        || typeof ticket.order_item_id !== 'string'
+        || typeof ticket.attendee_name !== 'string') {
         throw new Error('An issued ticket record is incomplete.');
+      }
+      const hasEntryCredential = ticket.status === 'issued' || ticket.status === 'checked_in';
+      const encryptedCredential = typeof ticket.credential_ciphertext === 'string'
+        ? ticket.credential_ciphertext
+        : null;
+      if (hasEntryCredential && !encryptedCredential) {
+        throw new Error('An active ticket credential is unavailable.');
       }
       return {
         id: ticket.id,
@@ -89,16 +112,20 @@ export async function GET() {
         status: ticket.status,
         issuedAt: ticket.issued_at,
         checkedInAt: ticket.checked_in_at,
-        credential: decryptTicketCredential(ticket.credential_ciphertext)
+        buyerName: ticket.attendee_name,
+        credential: hasEntryCredential && encryptedCredential
+          ? decryptTicketCredential(encryptedCredential)
+          : null
       };
     });
     return NextResponse.json({
       order: {
-        reference: order.reference,
-        buyerName: order.buyer_name,
-        amountMinor: order.total_minor,
-        currency: order.currency,
-        paidAt: order.paid_at
+        reference: session.ticketId ? tickets[0]?.reference || order.reference : order.reference,
+        buyerName: session.ticketId ? tickets[0]?.buyerName || '' : order.buyer_name,
+        amountMinor: session.ticketId ? null : order.total_minor,
+        currency: session.ticketId ? null : order.currency,
+        paidAt: order.paid_at,
+        isTransferredTicket: Boolean(session.ticketId)
       },
       event,
       tickets
