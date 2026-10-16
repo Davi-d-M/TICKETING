@@ -45,6 +45,8 @@ Admins can upload or replace JPEG, PNG and WebP event photos (up to 4 MB) from t
 
 The premium-experience migration adds venue maps and arrival guidance, per-ticket fees, configurable tier benefits, and server-validated promotion codes. It also adds transactional admin updates for event capacity and ticket tiers, plus an audited service-fee control. The platform owner can adjust the fixed fee while sales are open; the new fee applies to future checkouts and does not rewrite existing order totals. Sales cannot open until a Google Maps link, coordinates, or a complete venue address and city have been supplied. Only publish confirmed transport, parking and entrance information.
 
+The core migration safely leaves an existing `midnight-society-ke` organizer record unchanged when re-run. The premium-experience migration replaces the exact eight-argument checkout function because PostgreSQL cannot remove existing parameter defaults with `CREATE OR REPLACE`; the migration restores the intended function grants in the same transaction.
+
 The Live Operations view reads committed operational changes from an append-only, allowlisted database journal. It polls the protected API every five seconds and recovers using an event cursor; it is not a push/WebSocket connection or an external security log. It deliberately omits buyer contact details, payment payloads and ticket credential hashes.
 
 The verification migration adds safe customer verification, event-and-gate-assigned staff accounts, rate limits, atomic scan retry protection, security metrics and owner-approved ticket transfers.

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.ticketing_organizers (
 
 INSERT INTO public.ticketing_organizers (name, slug, status)
 VALUES ('MIDNIGHT SOCIETY KE', 'midnight-society-ke', 'approved')
-ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name;
+ON CONFLICT (slug) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.ticketing_organizer_members (
     organizer_id UUID NOT NULL REFERENCES public.ticketing_organizers(id) ON DELETE RESTRICT,

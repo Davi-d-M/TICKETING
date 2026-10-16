@@ -492,7 +492,14 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ticketing_start_checkout(
+-- A previous checkout signature may have been created with parameter defaults.
+-- PostgreSQL cannot remove defaults via CREATE OR REPLACE, so replace this exact
+-- eight-argument overload explicitly; its access grants are restored below.
+DROP FUNCTION IF EXISTS public.ticketing_start_checkout(
+    UUID, UUID, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT
+);
+
+CREATE FUNCTION public.ticketing_start_checkout(
     p_event_id UUID,
     p_ticket_type_id UUID,
     p_quantity INTEGER,
