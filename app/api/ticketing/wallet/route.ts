@@ -61,14 +61,33 @@ export async function GET() {
 
   const { data: items, error: itemsError } = await database
     .from('ticketing_order_items')
-    .select('id,ticket_name_snapshot')
+    .select('id,ticket_type_id,ticket_name_snapshot')
     .eq('order_id', order.id);
   if (itemsError) {
     console.error('[TicketingWallet] Could not load order items:', itemsError);
     return NextResponse.json({ error: 'Ticket details could not be loaded.' }, { status: 503 });
   }
 
-  const itemIds = (items || []).map(item => item.id);
+  const orderItems = (items || []) as unknown as Array<{ id: string; ticket_type_id: string; ticket_name_snapshot: string }>;
+  const itemIds = orderItems.map(item => item.id);
+  const ticketTypeIds = Array.from(new Set(orderItems.map(item => item.ticket_type_id).filter((id): id is string => typeof id === 'string')));
+  const typesResult = ticketTypeIds.length
+    ? await database.from('ticketing_ticket_types')
+      .select('id,wave_number,admission_type,wave_label,wave_theme')
+      .in('id', ticketTypeIds)
+    : { data: [], error: null };
+  if (typesResult.error) {
+    console.error('[TicketingWallet] Could not load ticket edition details:', typesResult.error);
+    return NextResponse.json({ error: 'Ticket edition details could not be loaded.' }, { status: 503 });
+  }
+  const ticketTypes = (typesResult.data || []) as unknown as Array<{
+    id: string;
+    wave_number: number | null;
+    admission_type: string;
+    wave_label: string;
+    wave_theme: string;
+  }>;
+  const waveByTypeId = new Map(ticketTypes.map(type => [type.id, type]));
   let walletTicketsQuery = database.from('ticketing_tickets')
     .select('id,order_item_id,ticket_reference,status,issued_at,checked_in_at,credential_hash,attendee_name,attendee_email')
     .in('order_item_id', itemIds)
@@ -86,7 +105,7 @@ export async function GET() {
 
   try {
     const itemsById = new Map<string, string>();
-    for (const item of items || []) {
+    for (const item of orderItems) {
       if (typeof item.id !== 'string' || typeof item.ticket_name_snapshot !== 'string') {
         throw new Error('A ticket order item is incomplete.');
       }
@@ -108,7 +127,18 @@ export async function GET() {
       return {
         id: ticket.id,
         reference: ticket.ticket_reference,
-        tier: itemsById.get(ticket.order_item_id) || 'Event admission',
+        tier: (() => {
+          const orderItem = orderItems.find(item => item.id === ticket.order_item_id);
+          const wave = typeof orderItem?.ticket_type_id === 'string' ? waveByTypeId.get(orderItem.ticket_type_id) : null;
+          return wave && wave.wave_number !== null
+            ? `${wave.wave_label} · ${wave.admission_type}`
+            : itemsById.get(ticket.order_item_id) || 'Event admission';
+        })(),
+        waveTheme: (() => {
+          const orderItem = orderItems.find(item => item.id === ticket.order_item_id);
+          const wave = typeof orderItem?.ticket_type_id === 'string' ? waveByTypeId.get(orderItem.ticket_type_id) : null;
+          return wave && wave.wave_number !== null ? wave.wave_theme : null;
+        })(),
         status: ticket.status,
         issuedAt: ticket.issued_at,
         checkedInAt: ticket.checked_in_at,

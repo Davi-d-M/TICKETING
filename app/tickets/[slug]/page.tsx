@@ -114,31 +114,52 @@ export default async function TicketEventPage({ params }: PageProps) {
               {event.ticket_types.map(ticketType => {
                 const notOpen = ticketType.sales_start_at && new Date(ticketType.sales_start_at).getTime() > now;
                 const closed = ticketType.sales_end_at && new Date(ticketType.sales_end_at).getTime() <= now;
+                const waveWaiting = ticketType.wave_number !== null && !ticketType.wave_open;
                 const schedule = notOpen
                   ? `Sales open ${formatEventDate(ticketType.sales_start_at!, event.timezone)}`
-                  : closed ? 'Sales window has ended' : `${ticketType.remaining.toLocaleString('en-KE')} remaining`;
+                  : closed ? 'Sales window has ended' : waveWaiting
+                    ? ticketType.activation_mode === 'manual' ? 'Waiting for organizer activation'
+                      : ticketType.activation_mode === 'previous_sold_out' ? 'Opens when the previous wave sells out or closes'
+                        : 'Scheduled opening is pending'
+                    : `${ticketType.remaining.toLocaleString('en-KE')} remaining`;
+                const waveThemeClass = ticketType.wave_theme === 'crimson-black'
+                  ? 'border-rose-300/25 bg-gradient-to-br from-[#241018] via-black/25 to-black/15'
+                  : ticketType.wave_theme === 'electric-violet'
+                    ? 'border-violet-300/25 bg-gradient-to-br from-[#17152d] via-black/25 to-black/15'
+                    : 'border-amber-200/25 bg-gradient-to-br from-[#251e13] via-black/25 to-black/15';
+                const waveAccentClass = ticketType.wave_theme === 'crimson-black'
+                  ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+                  : ticketType.wave_theme === 'electric-violet'
+                    ? 'border-violet-300/20 bg-violet-300/10 text-violet-100'
+                    : 'border-amber-200/20 bg-amber-200/10 text-amber-100';
                 return (
-                  <article key={ticketType.id} className="rounded-2xl border border-white/[0.08] bg-black/15 p-4 sm:p-5">
+                  <article key={ticketType.id} className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 ${ticketType.wave_number !== null ? waveThemeClass : 'border-white/[0.08] bg-black/15'}`}>
+                    {ticketType.wave_number !== null && <div aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${ticketType.wave_theme === 'crimson-black' ? 'bg-gradient-to-r from-rose-500 to-red-200' : ticketType.wave_theme === 'electric-violet' ? 'bg-gradient-to-r from-blue-400 to-violet-300' : 'bg-gradient-to-r from-amber-300 to-yellow-100'}`} />}
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-3">
-                        <span className="rounded-xl border border-orange-300/15 bg-orange-300/10 p-2.5 text-orange-200"><Ticket size={17} /></span>
-                        <div className="min-w-0"><h3 className="font-black text-white">{ticketType.name}</h3><p className="mt-1 text-xs leading-5 text-slate-400">{ticketType.description || 'Entry for one guest. Check the event details before the night.'}</p><p className="mt-2 text-[10px] text-slate-500">Limit: {ticketType.min_per_order}–{ticketType.max_per_order} per order</p></div>
+                        <span className={`rounded-xl border p-2.5 ${ticketType.wave_number !== null ? waveAccentClass : 'border-orange-300/15 bg-orange-300/10 text-orange-200'}`}><Ticket size={17} /></span>
+                        <div className="min-w-0">
+                          {ticketType.wave_number !== null && <p className={`mb-1 inline-flex rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${waveAccentClass}`}>{ticketType.wave_label} · {ticketType.admission_type}</p>}
+                          <h3 className="font-black text-white">{ticketType.wave_number !== null ? ticketType.admission_type : ticketType.name}</h3>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">{ticketType.description || 'Entry for one guest. Check the event details before the night.'}</p>
+                          <p className="mt-2 text-[10px] text-slate-500">Limit: {ticketType.min_per_order}–{ticketType.max_per_order} per order</p>
+                        </div>
                       </div>
-                      <p className="shrink-0 text-lg font-black text-orange-100">{formatPrice(ticketType.price_minor, ticketType.currency)}</p>
+                      <p className={`shrink-0 text-lg font-black ${ticketType.wave_number !== null ? ticketType.wave_theme === 'crimson-black' ? 'text-rose-100' : ticketType.wave_theme === 'electric-violet' ? 'text-violet-100' : 'text-amber-100' : 'text-orange-100'}`}>{formatPrice(ticketType.price_minor, ticketType.currency)}</p>
                     </div>
                     {ticketType.benefits.length > 0 && <ul className="mt-3 grid gap-1 text-xs text-slate-300 sm:grid-cols-2">{ticketType.benefits.map(benefit => <li key={benefit} className="flex items-start gap-2"><ShieldCheck size={13} className="mt-0.5 shrink-0 text-violet-200" />{benefit}</li>)}</ul>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
                       <span className="text-[10px] font-semibold text-slate-500">{schedule}</span>
                     </div>
-                    {notOpen || closed || ticketType.remaining < ticketType.min_per_order ? (
+                    {notOpen || closed || waveWaiting || ticketType.remaining < ticketType.min_per_order ? (
                       <p className="mt-3 text-xs font-bold text-slate-400">
-                        {notOpen ? 'Ticket sales have not opened.' : closed ? 'This ticket sale has ended.' : 'This ticket tier is sold out.'}
+                        {notOpen ? 'Ticket sales have not opened.' : closed ? 'This ticket sale has ended.' : waveWaiting ? schedule : 'This ticket tier is sold out.'}
                       </p>
                     ) : salesReady ? (
                       <PurchaseForm
                         eventId={event.id}
                         ticketTypeId={ticketType.id}
-                        name={ticketType.name}
+                        name={ticketType.wave_number !== null ? `${ticketType.wave_label} · ${ticketType.admission_type}` : ticketType.name}
                         price={String(ticketType.price_minor)}
                         serviceFeeMinor={event.service_fee_minor}
                         currency={ticketType.currency.trim()}

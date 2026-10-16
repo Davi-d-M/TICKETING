@@ -16,6 +16,13 @@ export type PublicTicketType = {
   benefits: string[];
   sales_start_at: string | null;
   sales_end_at: string | null;
+  wave_number: number | null;
+  admission_type: string;
+  wave_label: string;
+  activation_mode: 'scheduled' | 'previous_sold_out' | 'manual';
+  wave_theme: 'obsidian-gold' | 'crimson-black' | 'electric-violet';
+  wave_manual_open: boolean;
+  wave_open: boolean;
 };
 
 export type PublicTicketEvent = {
@@ -60,7 +67,8 @@ const eventFields = [
 
 const tierFields = [
   'id', 'event_id', 'name', 'description', 'price_minor', 'currency',
-  'min_per_order', 'max_per_order', 'capacity', 'benefits', 'sales_start_at', 'sales_end_at'
+  'min_per_order', 'max_per_order', 'capacity', 'benefits', 'sales_start_at', 'sales_end_at',
+  'wave_number', 'admission_type', 'wave_label', 'activation_mode', 'wave_theme', 'wave_manual_open'
 ].join(',');
 
 function isMissingTicketingSchema(error: { code?: string }) {
@@ -118,6 +126,9 @@ async function getPublicEvents(): Promise<PublicEventsResult> {
     .eq('status', 'active')
     .order('price_minor', { ascending: true });
   if (ticketTypesResult.error) {
+    if (isMissingTicketingSchema(ticketTypesResult.error)) {
+      return { ok: false, message: 'Apply supabase/TICKETING_WAVES_MIGRATION.sql to load ticket release waves.' };
+    }
     console.error('[PublicTicketing] Could not load active ticket tiers:', ticketTypesResult.error);
     return { ok: false, message: 'Ticket options could not be loaded right now. Please try again later.' };
   }
@@ -167,14 +178,43 @@ async function getPublicEvents(): Promise<PublicEventsResult> {
   }
 
   const typesByEvent = new Map<string, PublicTicketType[]>();
-  for (const ticketType of ticketTypes) {
+  const ticketTypesWithRemaining = ticketTypes.map(ticketType => {
     const remaining = Math.max(0, ticketType.capacity
       - (reservationsByType.get(ticketType.id) || 0)
       - (soldByType.get(ticketType.id) || 0));
-    typesByEvent.set(ticketType.event_id, [...(typesByEvent.get(ticketType.event_id) || []), { ...ticketType, remaining }]);
+    return { ...ticketType, remaining };
+  });
+  const typesById = new Map(ticketTypesWithRemaining.map(ticketType => [ticketType.id, ticketType]));
+  const now = Date.now();
+  for (const ticketType of ticketTypes) {
+    const typeWithRemaining = typesById.get(ticketType.id);
+    if (!typeWithRemaining) continue;
+    let waveOpen = true;
+    if (ticketType.wave_number !== null) {
+      if (ticketType.activation_mode === 'manual') {
+        waveOpen = ticketType.wave_manual_open;
+      } else if (ticketType.activation_mode === 'scheduled') {
+        waveOpen = Boolean(ticketType.sales_start_at && new Date(ticketType.sales_start_at).getTime() <= now);
+      } else {
+        const previousWave = ticketTypesWithRemaining.find(candidate =>
+          candidate.event_id === ticketType.event_id
+          && candidate.admission_type === ticketType.admission_type
+          && candidate.wave_number === ticketType.wave_number! - 1);
+        waveOpen = Boolean(previousWave && (
+          previousWave.remaining <= 0
+          || (previousWave.sales_end_at && new Date(previousWave.sales_end_at).getTime() <= now)
+        ));
+      }
+      waveOpen = waveOpen
+        && (!ticketType.sales_start_at || new Date(ticketType.sales_start_at).getTime() <= now)
+        && (!ticketType.sales_end_at || new Date(ticketType.sales_end_at).getTime() > now);
+    }
+    typesByEvent.set(ticketType.event_id, [
+      ...(typesByEvent.get(ticketType.event_id) || []),
+      { ...typeWithRemaining, wave_open: waveOpen }
+    ]);
   }
 
-  const now = Date.now();
   const events = rows
     .map(event => ({
       id: event.id,

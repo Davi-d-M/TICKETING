@@ -92,6 +92,7 @@ export async function isTicketingSalesReady() {
     database.from('ticketing_guest_access_links').select('id').limit(0),
     database.from('ticketing_gate_staff_assignments').select('event_id').limit(0),
     database.from('ticketing_rate_limit_windows').select('bucket_hash').limit(0),
+    database.from('ticketing_ticket_types').select('wave_number,admission_type,activation_mode,wave_manual_open').limit(0),
     database.from('ticketing_events').select('venue_maps_url,service_fee_minor').limit(0),
     database.from('ticketing_orders').select('promotion_id').limit(0),
     database.from('ticketing_admin_mfa')

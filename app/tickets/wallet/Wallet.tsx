@@ -26,7 +26,7 @@ type WalletData = {
     transport_guidance: string;
     dress_code: string;
   };
-  tickets: Array<{ id: string; reference: string; tier: string; status: string; issuedAt: string; checkedInAt: string | null; credential: string | null; credentialExpiresAt: number | null }>;
+  tickets: Array<{ id: string; reference: string; tier: string; waveTheme: string | null; status: string; issuedAt: string; checkedInAt: string | null; credential: string | null; credentialExpiresAt: number | null }>;
 };
 
 function localDate(value: string, timezone: string) {
@@ -44,6 +44,13 @@ function GuestTicket({ ticket }: { ticket: WalletData['tickets'][number] }) {
   const [transferName, setTransferName] = useState('');
   const [transferMessage, setTransferMessage] = useState('');
   const [transferBusy, setTransferBusy] = useState(false);
+  const waveStyle = ticket.waveTheme === 'crimson-black'
+    ? 'border-rose-300/30 bg-gradient-to-br from-[#29121b] to-[#110d13]'
+    : ticket.waveTheme === 'electric-violet'
+      ? 'border-violet-300/30 bg-gradient-to-br from-[#1a1931] to-[#100d17]'
+      : ticket.waveTheme === 'obsidian-gold'
+        ? 'border-amber-200/30 bg-gradient-to-br from-[#292113] to-[#100d17]'
+        : 'border-white/10 bg-black/15';
   useEffect(() => {
     let active = true;
     if (!ticket.credential) {
@@ -78,16 +85,18 @@ function GuestTicket({ ticket }: { ticket: WalletData['tickets'][number] }) {
   }
 
   return (
-    <article className="grid gap-5 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6">
+    <article className={`ticket-wallet-printable relative grid gap-5 overflow-hidden rounded-2xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6 ${waveStyle}`}>
+      {ticket.waveTheme && <div aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${ticket.waveTheme === 'crimson-black' ? 'bg-gradient-to-r from-rose-500 to-red-200' : ticket.waveTheme === 'electric-violet' ? 'bg-gradient-to-r from-blue-400 to-violet-300' : 'bg-gradient-to-r from-amber-300 to-yellow-100'}`} />}
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-200">{ticket.tier}</p>
+        <p className="ticket-wallet-edition text-[10px] font-black uppercase tracking-[0.18em] text-orange-200">{ticket.tier}</p>
         <h2 className="mt-2 text-lg font-black">{ticket.reference}</h2>
         <p className="mt-2 text-xs text-slate-400">Status: <span className="font-bold uppercase text-emerald-200">{ticket.status.replaceAll('_', ' ')}</span></p>
         {ticket.checkedInAt && <p className="mt-1 text-xs text-slate-400">Admitted: {new Date(ticket.checkedInAt).toLocaleString('en-KE')}</p>}
         <p className="mt-3 max-w-md text-[10px] leading-4 text-slate-500">Keep this code private. Entry is validated online, and each ticket can be admitted only once.</p>
         {ticket.credentialExpiresAt && <p className="mt-1 text-[10px] text-slate-500">This QR rotates every five minutes and refreshes automatically while this wallet is open.</p>}
         <Link href={`/tickets/verify?reference=${encodeURIComponent(ticket.reference)}`} className="mt-3 inline-block text-xs font-bold text-orange-200 hover:text-white">Check official ticket record</Link>
-        {ticket.status === 'issued' && <div className="mt-4">
+        <button type="button" onClick={() => window.print()} className="ticket-wallet-actions ml-4 inline-block text-xs font-bold text-orange-200 hover:text-white">Print ticket</button>
+        {ticket.status === 'issued' && <div className="ticket-wallet-actions mt-4">
           {!showTransfer
             ? <button type="button" onClick={() => { setTransferMessage(''); setShowTransfer(true); }} className="min-h-9 rounded-lg border border-orange-200/20 px-3 text-xs font-bold text-orange-100 hover:bg-orange-200/5">Request owner-approved transfer</button>
             : <form onSubmit={event => void requestTransfer(event)} className="mt-3 grid max-w-md gap-2 rounded-xl border border-white/10 p-3">
@@ -99,7 +108,7 @@ function GuestTicket({ ticket }: { ticket: WalletData['tickets'][number] }) {
           {transferMessage && <p role="status" className="mt-2 text-xs text-slate-300">{transferMessage}</p>}
         </div>}
       </div>
-      <div className="mx-auto rounded-xl bg-white p-3">
+      <div className="ticket-wallet-qr mx-auto rounded-xl bg-white p-3">
         {qr ? <Image src={qr} alt={`Entry QR for ticket ${ticket.reference}`} width={190} height={190} unoptimized /> : <div className="grid h-[190px] w-[190px] place-items-center text-center text-xs text-slate-500">{ticket.credential ? error || 'Preparing QR…' : 'This ticket is no longer active. Its QR credential is unavailable.'}</div>}
       </div>
     </article>
@@ -150,6 +159,14 @@ export default function Wallet() {
 
   return (
     <main className="min-h-screen bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
+      <style>{`@media print {
+        body * { visibility: hidden !important; }
+        .ticket-wallet-printable, .ticket-wallet-printable * { visibility: visible !important; }
+        .ticket-wallet-printable { position: relative !important; break-inside: avoid; margin: 0 0 12mm !important; border: 1px solid #111 !important; background: #fff !important; color: #111 !important; box-shadow: none !important; }
+        .ticket-wallet-printable .ticket-wallet-actions { display: none !important; }
+        .ticket-wallet-printable h2, .ticket-wallet-printable p, .ticket-wallet-printable a { color: #111 !important; }
+        .ticket-wallet-printable .ticket-wallet-qr { background: #fff !important; }
+      }`}</style>
       <div className="mx-auto max-w-4xl space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-orange-300/15 bg-gradient-to-br from-[#32172a] via-[#201320] to-[#120e18] p-6 sm:p-8">
           <div><p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">MIDNIGHT SOCIETY KE · private wallet</p><h1 className="mt-3 text-3xl font-black">Your tickets</h1><p className="mt-2 text-xs text-slate-300">Only share your entry QR with gate staff.</p></div>

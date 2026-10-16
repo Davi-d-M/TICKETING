@@ -27,8 +27,11 @@ Review all SQL files and confirm the target Supabase project before applying the
 6. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
 7. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 8. `supabase/TICKETING_MFA_MIGRATION.sql`
+9. `supabase/TICKETING_WAVES_MIGRATION.sql`
 
 Apply the MFA migration and configure `TICKETING_MFA_ENCRYPTION_KEY` and `TICKETING_QR_SIGNING_SECRET` before deploying this version: admin login will intentionally refuse to issue a session until the MFA migration/key are available, and wallet QR issuance/scanning needs the QR key. The first successful password sign-in enrolls the authenticator; do not remove the server-side encryption key afterward.
+
+The waves migration adds Wave I — The Awakening, Wave II — The Summoning and Wave III — The Final Call to the existing ticket-type model. Each admission type (for example General Admission or VIP) can have its own three releases, prices, allocations, benefits, sale windows, opening rule and visual theme. Scheduled waves open at their configured time; sell-out waves open only after their matching previous admission wave is fully sold/reserved or its sales deadline passes; manual waves stay closed until the owner activates them. Inventory reservations and checkout enforce the same transition rules transactionally. Configure only confirmed prices, allocations and benefits in the admin.
 
 The event-images migration creates a public-read-only bucket for JPEG, PNG and WebP artwork. Authenticated admin uploads are sent through the server-side API and limited to 4 MB. Apply it before using event photo uploads.
 

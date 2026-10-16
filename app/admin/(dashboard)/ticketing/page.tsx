@@ -39,6 +39,12 @@ type TicketType = {
   sales_start_at: string | null;
   sales_end_at: string | null;
   status: string;
+  wave_number: number | null;
+  admission_type: string;
+  wave_label: string;
+  activation_mode: 'scheduled' | 'previous_sold_out' | 'manual';
+  wave_theme: 'obsidian-gold' | 'crimson-black' | 'electric-violet';
+  wave_manual_open: boolean;
 };
 
 type TicketPromotion = {
@@ -95,7 +101,6 @@ const labelClass = 'block text-xs font-bold text-slate-300';
 function money(minor: number, currency = 'KES') {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency, maximumFractionDigits: 2 }).format(minor / 100);
 }
-
 function eventDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Date to be confirmed' : date.toLocaleString('en-KE', {
@@ -279,6 +284,96 @@ function TierForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreate
   );
 }
 
+const waveNames = ['Wave I — The Awakening', 'Wave II — The Summoning', 'Wave III — The Final Call'];
+
+function WaveForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreated: () => void; onCancel: () => void }) {
+  const [admissionType, setAdmissionType] = useState('General Admission');
+  const [waveNumber, setWaveNumber] = useState(1);
+  const [waveLabel, setWaveLabel] = useState(waveNames[0]);
+  const [activationMode, setActivationMode] = useState<'scheduled' | 'previous_sold_out' | 'manual'>('scheduled');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const existingWaveNumbers = useMemo(() => new Set(event.ticket_types
+    .filter(tier => tier.wave_number !== null && tier.admission_type === admissionType)
+    .map(tier => tier.wave_number)), [admissionType, event.ticket_types]);
+  const availableWaveNumbers = useMemo(() => [1, 2, 3].filter(number => !existingWaveNumbers.has(number)), [existingWaveNumbers]);
+  const hasPreviousWave = waveNumber === 1 || existingWaveNumbers.has(waveNumber - 1);
+
+  useEffect(() => {
+    if (availableWaveNumbers.length === 0 || availableWaveNumbers.includes(waveNumber)) return;
+    const nextWave = availableWaveNumbers[0];
+    setWaveNumber(nextWave);
+    setWaveLabel(waveNames[nextWave - 1]);
+    setActivationMode(nextWave === 1 ? 'scheduled' : 'previous_sold_out');
+  }, [admissionType, availableWaveNumbers, waveNumber]);
+
+  async function submit(formData: FormData) {
+    setSaving(true);
+    setError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_ticket_wave',
+          eventId: event.id,
+          admissionType,
+          waveNumber,
+          waveLabel: formData.get('waveLabel'),
+          price: formData.get('price'),
+          capacity: formData.get('capacity'),
+          minPerOrder: formData.get('minPerOrder'),
+          maxPerOrder: formData.get('maxPerOrder'),
+          activationMode,
+          waveTheme: formData.get('waveTheme'),
+          salesStartAt: formData.get('salesStartAt'),
+          salesEndAt: formData.get('salesEndAt'),
+          description: formData.get('description'),
+          benefits: String(formData.get('benefits') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean)
+        })
+      }));
+      onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Ticket wave could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="mt-4 rounded-xl border border-orange-300/20 bg-[#100d17] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div><h4 className="text-sm font-black text-white">Configure a ticket wave</h4><p className="mt-1 text-[10px] text-slate-400">Set this release&apos;s real price, allocation, opening rule, and deliverable benefits.</p></div>
+        <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Close</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className={labelClass}>Admission type<select className={inputClass} value={admissionType} onChange={event => setAdmissionType(event.target.value)}><option>General Admission</option><option>VIP</option><option>Group Package</option><option>Backstage / Exclusive</option></select></label>
+        <label className={labelClass}>Wave<select className={inputClass} value={availableWaveNumbers.includes(waveNumber) ? waveNumber : ''} onChange={event => {
+          const next = Number(event.target.value);
+          setWaveNumber(next);
+          setWaveLabel(waveNames[next - 1]);
+          setActivationMode(next === 1 ? 'scheduled' : 'previous_sold_out');
+        }}>{availableWaveNumbers.length === 0 ? <option value="" disabled>All waves configured</option> : availableWaveNumbers.map(number => <option key={number} value={number}>Wave {['I', 'II', 'III'][number - 1]}</option>)}</select></label>
+        <label className={labelClass}>Ticket appearance<select className={inputClass} name="waveTheme" defaultValue="obsidian-gold"><option value="obsidian-gold">Obsidian Black & Antique Gold</option><option value="crimson-black">Midnight Crimson & Black</option><option value="electric-violet">Electric Blue & Violet</option></select></label>
+        <label className={`${labelClass} sm:col-span-2`}>Wave edition label<input className={inputClass} name="waveLabel" required minLength={2} maxLength={100} value={waveLabel} onChange={event => setWaveLabel(event.target.value)} /></label>
+        <label className={labelClass}>Price (KES)<input className={inputClass} name="price" required type="number" min="0.01" max="999999999.99" step="0.01" placeholder="Set confirmed price" /></label>
+        <label className={labelClass}>Wave allocation<input className={inputClass} name="capacity" required type="number" min="1" max="1000000" placeholder="Set confirmed allocation" /></label>
+        <label className={labelClass}>Opens when<select className={inputClass} value={activationMode} onChange={event => setActivationMode(event.target.value as typeof activationMode)}><option value="scheduled">At a scheduled time</option><option value="previous_sold_out" disabled={waveNumber === 1 || !hasPreviousWave}>When previous wave sells out / closes</option><option value="manual">Only when I activate it</option></select></label>
+        {activationMode === 'scheduled' && <label className={labelClass}>Sales open<input className={inputClass} name="salesStartAt" type="datetime-local" required /></label>}
+        {activationMode !== 'scheduled' && <input type="hidden" name="salesStartAt" value="" />}
+        <label className={labelClass}>Sales close (optional)<input className={inputClass} name="salesEndAt" type="datetime-local" /></label>
+        {!hasPreviousWave && waveNumber > 1 && <p className="text-xs text-amber-200 sm:col-span-2 lg:col-span-3">Create the preceding wave for {admissionType} before selecting automatic sell-out activation.</p>}
+        <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Description<input className={inputClass} name="description" maxLength={2000} placeholder="Tell guests what this release includes." /></label>
+        <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Benefits (one per line)<textarea className={`${inputClass} min-h-20 py-3`} name="benefits" maxLength={4000} placeholder={'Event admission\nDigital QR ticket\nEvent updates'} /></label>
+        <label className={labelClass}>Minimum per order<input className={inputClass} name="minPerOrder" type="number" min="1" max="100" defaultValue="1" /></label>
+        <label className={labelClass}>Maximum per order<input className={inputClass} name="maxPerOrder" type="number" min="1" max="100" defaultValue="10" /></label>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      <button disabled={saving || availableWaveNumbers.length === 0 || (activationMode === 'previous_sold_out' && !hasPreviousWave)} className="mt-4 min-h-10 rounded-lg bg-orange-400 px-4 text-xs font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">{saving ? 'Saving wave…' : 'Save ticket wave'}</button>
+    </form>
+  );
+}
+
 function EventExperienceForm({ event, onSaved, onCancel }: { event: TicketEvent; onSaved: () => void; onCancel: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -399,22 +494,28 @@ function EditTierForm({ event, tier, onSaved, onCancel }: {
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [waveActivationMode, setWaveActivationMode] = useState(tier.activation_mode);
+  const [salesStartAt, setSalesStartAt] = useState(dateTimeInput(tier.sales_start_at));
 
   async function submit(formData: FormData) {
     setSaving(true);
     setError('');
     try {
+      const isWave = tier.wave_number !== null;
       await readResponse(await fetch('/api/admin/ticketing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'update_ticket_type',
+          action: isWave ? 'update_ticket_wave' : 'update_ticket_type',
           eventId: event.id,
           ticketTypeId: tier.id,
           name: formData.get('name'),
+          waveLabel: formData.get('waveLabel'),
           description: formData.get('description'),
           price: formData.get('price'),
           capacity: formData.get('capacity'),
+          waveTheme: formData.get('waveTheme'),
+          activationMode: formData.get('activationMode'),
           benefits: String(formData.get('benefits') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
           minPerOrder: formData.get('minPerOrder'),
           maxPerOrder: formData.get('maxPerOrder'),
@@ -437,19 +538,26 @@ function EditTierForm({ event, tier, onSaved, onCancel }: {
         <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Cancel</button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className={labelClass}>Tier name<input className={inputClass} name="name" required minLength={2} maxLength={100} defaultValue={tier.name} /></label>
+        {tier.wave_number !== null
+          ? <><label className={labelClass}>Admission type<input className={inputClass} value={tier.admission_type} readOnly /></label><label className={labelClass}>Wave edition label<input className={inputClass} name="waveLabel" required minLength={2} maxLength={100} defaultValue={tier.wave_label} /></label><label className={labelClass}>Ticket appearance<select className={inputClass} name="waveTheme" defaultValue={tier.wave_theme}><option value="obsidian-gold">Obsidian Black & Antique Gold</option><option value="crimson-black">Midnight Crimson & Black</option><option value="electric-violet">Electric Blue & Violet</option></select></label></>
+          : <label className={labelClass}>Tier name<input className={inputClass} name="name" required minLength={2} maxLength={100} defaultValue={tier.name} /></label>}
         <label className={labelClass}>Price (KES)<input className={inputClass} name="price" required type="number" min="0.01" max="999999999.99" step="0.01" defaultValue={(tier.price_minor / 100).toFixed(2)} /></label>
         <label className={labelClass}>Allocation<input className={inputClass} name="capacity" required type="number" min="1" max="1000000" defaultValue={tier.capacity} /></label>
         <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Description<input className={inputClass} name="description" maxLength={2000} defaultValue={tier.description} /></label>
         <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>Included benefits (one per line)<textarea className={`${inputClass} min-h-20 py-3`} name="benefits" maxLength={4000} defaultValue={tier.benefits.join('\n')} /></label>
         <label className={labelClass}>Minimum per order<input className={inputClass} name="minPerOrder" required type="number" min="1" max="100" defaultValue={tier.min_per_order} /></label>
         <label className={labelClass}>Maximum per order<input className={inputClass} name="maxPerOrder" required type="number" min="1" max="100" defaultValue={tier.max_per_order} /></label>
-        <label className={labelClass}>Sales open<input className={inputClass} name="salesStartAt" type="datetime-local" defaultValue={dateTimeInput(tier.sales_start_at)} /></label>
+        {tier.wave_number !== null && <label className={labelClass}>Opens when<select className={inputClass} name="activationMode" value={waveActivationMode} onChange={change => {
+          const nextMode = change.target.value as typeof waveActivationMode;
+          setWaveActivationMode(nextMode);
+          if (nextMode !== 'scheduled') setSalesStartAt('');
+        }}><option value="scheduled">At a scheduled time</option><option value="previous_sold_out" disabled={tier.wave_number === 1 || !event.ticket_types.some(other => other.admission_type === tier.admission_type && other.wave_number === tier.wave_number! - 1)}>When previous wave sells out / closes</option><option value="manual">Only when I activate it</option></select></label>}
+        <label className={labelClass}>Sales open<input className={inputClass} name="salesStartAt" type="datetime-local" required={tier.wave_number !== null && waveActivationMode === 'scheduled'} value={salesStartAt} onChange={change => setSalesStartAt(change.target.value)} /></label>
         <label className={labelClass}>Sales close<input className={inputClass} name="salesEndAt" type="datetime-local" defaultValue={dateTimeInput(tier.sales_end_at)} /></label>
       </div>
       {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       <button disabled={saving} className="mt-4 min-h-10 rounded-lg bg-orange-400 px-4 text-sm font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">{saving ? 'Saving changes…' : 'Save tier changes'}</button>
-      <p className="mt-2 text-[10px] text-slate-500">Tier terms lock as soon as an order exists or ticket sales open.</p>
+      <p className="mt-2 text-[10px] text-slate-500">Ticket terms and wave configuration lock as soon as an order exists or event sales open.</p>
     </form>
   );
 }
@@ -517,11 +625,36 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
   const [editingServiceFee, setEditingServiceFee] = useState(false);
   const [addingPromotion, setAddingPromotion] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [addingWave, setAddingWave] = useState(false);
+  const [waveSavingId, setWaveSavingId] = useState<string | null>(null);
   const [statusError, setStatusError] = useState('');
   const [photoSaving, setPhotoSaving] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [promotionError, setPromotionError] = useState('');
   const allocated = event.ticket_types.reduce((total, tier) => total + tier.capacity, 0);
+  async function setWaveStatus(tier: TicketType, status: 'active' | 'paused') {
+    setWaveSavingId(tier.id);
+    setStatusError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: tier.activation_mode === 'manual' && status === 'active' ? 'set_manual_ticket_wave_open' : 'set_ticket_wave_status',
+          eventId: event.id,
+          ticketTypeId: tier.id,
+          status,
+          open: status === 'active'
+        })
+      }));
+      onRefresh();
+    } catch (cause) {
+      setStatusError(cause instanceof Error ? cause.message : 'Ticket wave status could not be changed.');
+    } finally {
+      setWaveSavingId(null);
+    }
+  }
+
   async function setStatus(status: 'scheduled' | 'on_sale') {
     setStatusSaving(true);
     setStatusError('');
@@ -642,12 +775,16 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
               <button type="button" onClick={() => setAddingTier(value => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs font-black text-orange-100 hover:bg-white/5">
                 <Plus size={14} /> Add tier
               </button>
+              <button type="button" onClick={() => setAddingWave(value => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-300/25 px-3 text-xs font-black text-orange-100 hover:bg-orange-300/5">
+                <Ticket size={14} /> Configure ticket waves
+              </button>
               {canPublish && <button type="button" onClick={() => void setStatus('on_sale')} disabled={!salesReady || statusSaving || event.ticket_types.length === 0} title={!salesReady ? 'Release gates are not configured.' : event.ticket_types.length === 0 ? 'Add a ticket tier before opening sales.' : ''} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-orange-400 px-3 text-xs font-black text-[#170d18] hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-40">{statusSaving ? 'Updating…' : 'Open sales'}</button>}
             </div>
           ) : <span className="text-xs font-semibold text-slate-500">Tiers locked for this event state</span>}
         </div>
         {event.status === 'on_sale' && <button type="button" onClick={() => void setStatus('scheduled')} disabled={statusSaving} className="mt-3 min-h-9 rounded-lg border border-amber-200/20 px-3 text-xs font-bold text-amber-100 hover:bg-amber-100/5 disabled:opacity-50">{statusSaving ? 'Updating…' : 'Pause ticket sales'}</button>}
         {statusError && <p role="alert" className="mt-3 text-xs text-red-200">{statusError}</p>}
+        {addingWave && <WaveForm event={event} onCancel={() => setAddingWave(false)} onCreated={() => { setAddingWave(false); onRefresh(); }} />}
         {event.ticket_types.length > 0 ? (
           <div className="mt-4 divide-y divide-white/10 rounded-xl border border-white/10">
             {event.ticket_types.map(tier => (
@@ -655,10 +792,20 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="mt-0.5 rounded-lg bg-orange-400/10 p-2 text-orange-300"><Ticket size={15} /></span>
-                    <div className="min-w-0"><p className="truncate text-sm font-black text-white">{tier.name}</p><p className="mt-1 text-xs text-slate-400">{tier.description || 'No tier description'} · {tier.min_per_order}–{tier.max_per_order} per order</p>{tier.benefits.length > 0 && <p className="mt-1 text-[10px] text-violet-200">{tier.benefits.join(' · ')}</p>}</div>
+                    <div className="min-w-0">
+                      {tier.wave_number !== null && <p className="mb-1 text-[9px] font-black uppercase tracking-[0.16em] text-orange-200">{tier.wave_label} · {tier.admission_type}</p>}
+                      <p className="truncate text-sm font-black text-white">{tier.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">{tier.description || 'No tier description'} · {tier.min_per_order}–{tier.max_per_order} per order</p>
+                      {tier.wave_number !== null && <p className="mt-1 text-[10px] text-slate-500">Opens {tier.activation_mode === 'scheduled' ? 'on schedule' : tier.activation_mode === 'previous_sold_out' ? 'after prior wave sells out or closes' : tier.wave_manual_open && tier.status === 'active' ? 'manually activated' : 'when you activate it'} · {tier.wave_theme.replaceAll('-', ' & ')}</p>}
+                      {tier.benefits.length > 0 && <p className="mt-1 text-[10px] text-violet-200">{tier.benefits.join(' · ')}</p>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right"><p className="text-sm font-black text-orange-100">{money(tier.price_minor, tier.currency)}</p><p className="mt-1 text-xs text-slate-400">{tier.capacity.toLocaleString('en-KE')} allocated · {statusLabel(tier.status)}</p></div>
+                    {tier.wave_number !== null && canPublish && <button type="button" onClick={() => {
+                      const isClosed = tier.status === 'paused' || (tier.activation_mode === 'manual' && !tier.wave_manual_open);
+                      void setWaveStatus(tier, isClosed ? 'active' : 'paused');
+                    }} disabled={waveSavingId === tier.id} className="min-h-9 rounded-lg border border-white/10 px-3 text-xs font-bold text-amber-100 hover:bg-white/5 disabled:opacity-50">{waveSavingId === tier.id ? 'Saving…' : tier.status === 'paused' || (tier.activation_mode === 'manual' && !tier.wave_manual_open) ? 'Activate wave' : 'Pause wave'}</button>}
                     {['draft', 'scheduled'].includes(event.status) && tier.status !== 'archived' && <button type="button" onClick={() => setEditingTierId(value => value === tier.id ? null : tier.id)} className="min-h-9 rounded-lg border border-white/10 px-3 text-xs font-bold text-orange-100 hover:bg-white/5">{editingTierId === tier.id ? 'Close' : 'Edit'}</button>}
                   </div>
                 </div>
