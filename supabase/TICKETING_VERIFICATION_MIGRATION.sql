@@ -226,11 +226,12 @@ BEGIN
     SELECT * INTO v_order FROM public.ticketing_orders
     WHERE id = p_order_id AND status = 'paid';
     IF NOT FOUND THEN RAISE EXCEPTION 'Paid ticket order was not found.' USING ERRCODE = 'P0002'; END IF;
-    SELECT tickets, tickets.event_id INTO v_ticket, v_event_id
+    SELECT tickets.* INTO v_ticket
     FROM public.ticketing_tickets AS tickets
     JOIN public.ticketing_order_items AS items ON items.id = tickets.order_item_id
     WHERE tickets.id = p_ticket_id AND items.order_id = p_order_id
     FOR UPDATE OF tickets;
+    v_event_id := v_ticket.event_id;
     IF NOT FOUND OR v_ticket.status <> 'issued'
         OR lower(v_ticket.attendee_email) <> lower(trim(p_from_email)) THEN
         RAISE EXCEPTION 'Only an active ticket in this wallet can be transferred.' USING ERRCODE = 'P0001';
