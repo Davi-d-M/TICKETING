@@ -130,6 +130,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'A valid ticketing request is required.' }, { status: 400 });
   }
 
+  if (body.action === 'update_event_service_fee') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const serviceFeeMinor = parseMoney(body.serviceFee);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)
+      || serviceFeeMinor === null || serviceFeeMinor > 100_000_000) {
+      return NextResponse.json({ error: 'Enter a valid event and per-ticket service fee.' }, { status: 400 });
+    }
+    const isOwner = session?.role.toLowerCase() === 'owner';
+    const { data, error } = await database.rpc('ticketing_update_event_service_fee', {
+      p_event_id: eventId,
+      p_service_fee_minor: serviceFeeMinor,
+      p_actor_email: session?.email || '',
+      p_allow_on_sale: isOwner
+    });
+    if (error || !data) {
+      if (error?.code === 'P0001') return NextResponse.json({ error: error.message }, { status: 409 });
+      if (error?.code === 'P0002') return NextResponse.json({ error: 'The selected event was not found.' }, { status: 404 });
+      if (error?.code === '22023') return NextResponse.json({ error: 'The service fee is invalid.' }, { status: 400 });
+      if (error?.code === '42501') return NextResponse.json({ error: error.message }, { status: 403 });
+      console.error('[TicketingAdmin] Could not update event service fee:', error);
+      return NextResponse.json({ error: 'The service fee could not be updated.' }, { status: 503 });
+    }
+    return NextResponse.json({ event: data });
+  }
+
   if (body.action === 'set_event_status') {
     const eventId = typeof body.eventId === 'string' ? body.eventId : '';
     const status = typeof body.status === 'string' ? body.status : '';

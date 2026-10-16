@@ -4,7 +4,7 @@ The standalone Ticketing application is managed at `/admin/ticketing` and serves
 
 ## Implemented flows
 
-- Owner/admin event and tier management, including venue arrival guidance, per-ticket fees, ticket benefits, capacity, sale windows and promotion codes. Tier terms lock once an order exists; venue/service-fee changes lock after sales open, and the service fee also locks once any order is recorded. Only the platform owner can open sales. Opening sales requires future event dates, an active paid tier, a verified map destination and explicit server-side release approvals.
+- Owner/admin event and tier management, including venue arrival guidance, fixed per-ticket fees, ticket benefits, capacity, sale windows and promotion codes. The platform owner can adjust the service fee while sales are open; future checkouts use the new fee while existing order totals stay unchanged. Tier terms lock once an order exists, and venue changes lock after sales open. Only the platform owner can open ticket sales. Opening sales requires future event dates, an active paid tier, a verified map destination and explicit server-side release approvals.
 - Paystack KES checkout with a 15-minute inventory reservation, idempotent order/payment records, signed webhook validation, independent server-side payment verification, and exact amount/currency/buyer-email matching.
 - Tickets are issued only after verified payment. Credentials are hashed for validation and encrypted at rest for private guest-wallet display.
 - Buyers retrieve their wallet through an emailed, single-use, 30-minute access link and an HttpOnly, 30-day session cookie. A rate-limited resend form is available if delivery fails.
@@ -29,7 +29,7 @@ Review all SQL files and confirm the target Supabase project before applying the
 
 The event-images migration creates a public-read-only bucket for JPEG, PNG and WebP artwork. Authenticated admin uploads are sent through the server-side API and limited to 4 MB. Apply it before using event photo uploads.
 
-The premium-experience migration extends checkout pricing with server-calculated fees and promotions, adds event arrival data and tier benefits, and provides atomic admin update functions. Promotion redemptions count paid purchases and unexpired reservations; checkout revalidates under a promotion row lock. Ticket-tier edits are locked once an order exists, and venue/service-fee updates are transactional and restricted to draft or scheduled events.
+The premium-experience migration extends checkout pricing with server-calculated fees and promotions, adds event arrival data and tier benefits, and provides atomic admin update functions. Promotion redemptions count paid purchases and unexpired reservations; checkout revalidates under a promotion row lock. Ticket-tier edits are locked once an order exists, venue changes are restricted to draft or scheduled events, and the platform owner can change the per-ticket service fee while sales are open. Each order keeps the fee snapshot calculated when checkout started.
 
 The commerce migration extends the core schema and replaces gate check-in logic to reject cancelled, postponed, completed or out-of-window events. The verification migration adds assigned staff, scan retry IDs, rate limits, public verification, operations metrics and approval-based transfers. It uses only `ticketing_*` objects, enables RLS on new tables, revokes browser-role access and grants server-side access to `service_role`. Do not enable sales unless every migration has completed successfully.
 

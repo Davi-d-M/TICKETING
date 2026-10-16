@@ -341,6 +341,56 @@ function EventExperienceForm({ event, onSaved, onCancel }: { event: TicketEvent;
   );
 }
 
+function ServiceFeeForm({ eventId, serviceFeeMinor, onSaved, onCancel }: {
+  eventId: string;
+  serviceFeeMinor: number;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(formData: FormData) {
+    setSaving(true);
+    setError('');
+    try {
+      await readResponse(await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_event_service_fee',
+          eventId,
+          serviceFee: formData.get('serviceFee')
+        })
+      }));
+      onSaved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The service fee could not be updated.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form action={submit} className="mb-5 rounded-xl border border-orange-300/15 bg-[#100d17] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-black text-white">Control service fee</h4>
+          <p className="mt-1 text-[10px] leading-4 text-slate-400">This fixed fee applies to each new ticket checkout. Existing orders keep the amount they were quoted and paid.</p>
+        </div>
+        <button type="button" onClick={onCancel} className="text-xs font-bold text-slate-400">Close</button>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className={`${labelClass} min-w-52 flex-1`}>Service fee per ticket (KES)
+          <input className={inputClass} name="serviceFee" required type="number" min="0" max="1000000" step="0.01" defaultValue={(serviceFeeMinor / 100).toFixed(2)} />
+        </label>
+        <button disabled={saving} className="min-h-11 rounded-xl bg-orange-400 px-5 text-xs font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">{saving ? 'Saving…' : 'Save service fee'}</button>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    </form>
+  );
+}
+
 function EditTierForm({ event, tier, onSaved, onCancel }: {
   event: TicketEvent;
   tier: TicketType;
@@ -464,6 +514,7 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
   const [addingTier, setAddingTier] = useState(false);
   const [editingTierId, setEditingTierId] = useState<string | null>(null);
   const [editingExperience, setEditingExperience] = useState(false);
+  const [editingServiceFee, setEditingServiceFee] = useState(false);
   const [addingPromotion, setAddingPromotion] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState('');
@@ -560,9 +611,11 @@ function EventCard({ event, onRefresh, salesReady, canPublish }: {
         </div>
         <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-3">
           <p className="mr-auto text-xs text-slate-300">Service fee: <strong className="text-white">{money(event.service_fee_minor)} per ticket</strong></p>
+          {(['draft', 'scheduled'].includes(event.status) || (event.status === 'on_sale' && canPublish)) && <button type="button" onClick={() => setEditingServiceFee(value => !value)} className="min-h-9 rounded-lg border border-orange-200/20 px-3 text-xs font-bold text-orange-100 hover:bg-orange-100/5">{editingServiceFee ? 'Close fee control' : 'Control service fee'}</button>}
           {['draft', 'scheduled'].includes(event.status) && <button type="button" onClick={() => { setEditingExperience(value => !value); setAddingPromotion(false); }} className="min-h-9 rounded-lg border border-white/10 px-3 text-xs font-bold text-orange-100 hover:bg-white/5">{editingExperience ? 'Close event details' : 'Edit venue, arrival & fee'}</button>}
           {['draft', 'scheduled'].includes(event.status) && <button type="button" onClick={() => { setAddingPromotion(value => !value); setEditingExperience(false); }} className="min-h-9 rounded-lg border border-violet-200/20 px-3 text-xs font-bold text-violet-100 hover:bg-violet-100/5">{addingPromotion ? 'Close discount form' : `Discounts (${event.promotions.length})`}</button>}
         </div>
+        {editingServiceFee && <ServiceFeeForm eventId={event.id} serviceFeeMinor={event.service_fee_minor} onCancel={() => setEditingServiceFee(false)} onSaved={() => { setEditingServiceFee(false); onRefresh(); }} />}
         {editingExperience && <EventExperienceForm event={event} onCancel={() => setEditingExperience(false)} onSaved={() => { setEditingExperience(false); onRefresh(); }} />}
         {addingPromotion && <PromotionForm eventId={event.id} onCancel={() => setAddingPromotion(false)} onSaved={() => { setAddingPromotion(false); onRefresh(); }} />}
         {event.promotions.length > 0 && (
