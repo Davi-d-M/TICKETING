@@ -11,6 +11,8 @@ export type PublicTicketType = {
   currency: string;
   min_per_order: number;
   max_per_order: number;
+  capacity: number;
+  remaining: number;
   sales_start_at: string | null;
   sales_end_at: string | null;
 };
@@ -47,7 +49,7 @@ const eventFields = [
 
 const tierFields = [
   'id', 'event_id', 'name', 'description', 'price_minor', 'currency',
-  'min_per_order', 'max_per_order', 'sales_start_at', 'sales_end_at'
+  'min_per_order', 'max_per_order', 'capacity', 'sales_start_at', 'sales_end_at'
 ].join(',');
 
 function isMissingTicketingSchema(error: { code?: string }) {
@@ -109,9 +111,56 @@ async function getPublicEvents(): Promise<PublicEventsResult> {
     return { ok: false, message: 'Ticket options could not be loaded right now. Please try again later.' };
   }
 
+  const ticketTypes = (ticketTypesResult.data || []) as unknown as PublicTicketType[];
+  const ticketTypeIds = ticketTypes.map(ticketType => ticketType.id);
+  const [reservationsResult, orderItemsResult] = await Promise.all([
+    database.from('ticketing_reservations')
+      .select('ticket_type_id,quantity')
+      .in('ticket_type_id', ticketTypeIds)
+      .eq('status', 'reserved')
+      .gt('expires_at', new Date().toISOString()),
+    database.from('ticketing_order_items')
+      .select('id,ticket_type_id')
+      .in('ticket_type_id', ticketTypeIds)
+  ]);
+  if (reservationsResult.error || orderItemsResult.error) {
+    const error = reservationsResult.error || orderItemsResult.error;
+    console.error('[PublicTicketing] Could not load ticket availability:', error);
+    return { ok: false, message: 'Ticket availability could not be loaded right now. Please try again later.' };
+  }
+
+  const orderItems = (orderItemsResult.data || []) as unknown as Array<{ id: string; ticket_type_id: string }>;
+  const itemIds = orderItems.map(item => item.id);
+  const soldTicketsResult = itemIds.length
+    ? await database.from('ticketing_tickets')
+      .select('order_item_id')
+      .in('order_item_id', itemIds)
+      .in('status', ['issued', 'checked_in'])
+    : { data: [], error: null };
+  if (soldTicketsResult.error) {
+    console.error('[PublicTicketing] Could not load issued ticket counts:', soldTicketsResult.error);
+    return { ok: false, message: 'Ticket availability could not be loaded right now. Please try again later.' };
+  }
+
+  const reservationsByType = new Map<string, number>();
+  const reservations = (reservationsResult.data || []) as unknown as Array<{ ticket_type_id: string; quantity: number }>;
+  for (const reservation of reservations) {
+    reservationsByType.set(reservation.ticket_type_id, (reservationsByType.get(reservation.ticket_type_id) || 0) + Number(reservation.quantity));
+  }
+  const itemTypeById = new Map(orderItems.map(item => [item.id, item.ticket_type_id]));
+  const soldByType = new Map<string, number>();
+  const soldTickets = (soldTicketsResult.data || []) as unknown as Array<{ order_item_id: string }>;
+  for (const ticket of soldTickets) {
+    const ticketTypeId = itemTypeById.get(ticket.order_item_id);
+    if (ticketTypeId) soldByType.set(ticketTypeId, (soldByType.get(ticketTypeId) || 0) + 1);
+  }
+
   const typesByEvent = new Map<string, PublicTicketType[]>();
-  for (const ticketType of (ticketTypesResult.data || []) as unknown as PublicTicketType[]) {
-    typesByEvent.set(ticketType.event_id, [...(typesByEvent.get(ticketType.event_id) || []), ticketType]);
+  for (const ticketType of ticketTypes) {
+    const remaining = Math.max(0, ticketType.capacity
+      - (reservationsByType.get(ticketType.id) || 0)
+      - (soldByType.get(ticketType.id) || 0));
+    typesByEvent.set(ticketType.event_id, [...(typesByEvent.get(ticketType.event_id) || []), { ...ticketType, remaining }]);
   }
 
   const now = Date.now();

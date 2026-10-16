@@ -1,50 +1,44 @@
 # ONLINE BAR Ticketing
 
-The Ticketing control centre is an isolated Online Bar Admin module at `/admin/ticketing`. It uses the existing admin session for platform-owner/admin authorization and stores its records in dedicated `ticketing_*` Supabase tables. It does not read from or write to the drink-order, product inventory, merchant payout, or waitlist tables.
+The standalone Ticketing application is managed at `/admin/ticketing` and serves event discovery at `/tickets`. It stores data in isolated `ticketing_*` Supabase tables; it does not use drink-order, product inventory, merchant payout or waitlist tables.
 
-## Current phase
+## Implemented flows
 
-- Admin can create private event drafts and ticket tiers with KES prices, capacity, purchase limits, sale windows, venue, dates, age limit, description, and cancellation policy.
-- The public `/tickets` and `/tickets/[slug]` pages show only future events belonging to approved organizers and explicitly marked on sale, with a Halloween-night theme and published tier prices. Purchase controls remain disabled; there is no public checkout.
-- Server-side validation prevents invalid dates, price formats, purchase limits, and tier allocations beyond an event's stated capacity.
-- The core migration establishes isolated records for organizers, events, ticket tiers, reservations, orders, payment attempts and webhook deduplication, individual tickets, gate check-ins, refunds, promotions, notification jobs, and audit history.
-- The reservation and gate-check-in database functions are transactional and use ticket-level locking to prevent overselling and duplicate admission.
-- The Halloween-themed Trust & Security Centre records manually reported security cases, owner-only case assignment/status changes, and append-only case activity in the dedicated security migration.
-- The Halloween Live Operations page reads committed Ticketing database activity and current record counts through admin-only APIs. Its database trigger journal excludes buyer contact information, payment payloads and credential hashes; the page polls every five seconds and recovers from a cursor, but is not a push/WebSocket feed.
-- The live operations journal is not a substitute for protected external security logging or automated attack detection. MFA enforcement, provider payment callbacks, customer isolation, five-minute QR rotation, authorized scanner sessions, and backup verification remain unimplemented.
-- Customer checkout, Daraja/Paystack payment verification, ticket issuance, transfer/refund operations, transactional notifications, and staff scanner access are not enabled in this initial phase. No customer can buy tickets from the public pages.
-- The Android application currently wraps the Online Bar website and has no customer ticket wallet; website screenshot detection is not reliably available, and Android wallet screenshot defenses cannot be considered active until that wallet screen and its authorization flow exist.
+- Owner/admin event and tier management; only the platform owner can open sales. Opening sales requires future event dates, an active paid tier, explicit server-side release approvals and the commerce migration.
+- Paystack KES checkout with a 15-minute inventory reservation, idempotent order/payment records, signed webhook validation, independent server-side payment verification, and exact amount/currency/buyer-email matching.
+- Tickets are issued only after verified payment. Credentials are hashed for validation and encrypted at rest for private guest-wallet display.
+- Buyers retrieve their wallet through an emailed, single-use, 30-minute access link and an HttpOnly, 30-day session cookie. A rate-limited resend form is available if delivery fails.
+- Online gate scanning supports camera QR scanning where the browser has `BarcodeDetector`, plus handheld keyboard-style scanners. Database locking prevents duplicate admission; the scanner is restricted to platform admins, not event-scoped staff.
+- Sales default to disabled. No payment provider, database or email credentials are committed to this repository.
 
-## Complete product scope
-
-The isolated system is intended to grow through release-gated phases into:
-
-1. **Event discovery and customer wallet:** expand the read-only public listing into mobile event pages, organizer/event details, posters and lineups, policies/accessibility, verified customer accounts or secure guest retrieval, orders, digital tickets and communication preferences.
-2. **Ticket commerce:** early-bird/regular/VIP/group/table/complementary allocations, server-priced checkout, promotion and referral attribution, temporary inventory reservations, sale windows, buyer limits and safe expiry/recovery.
-3. **Verified payments and finance:** Daraja M-Pesa STK Push first, other approved providers through adapters, authenticated/idempotent callbacks, late-payment handling, receipts, refund requests/outcomes, dispute evidence, ledger reconciliation, fees and organizer settlements.
-4. **Admission operations:** random per-ticket credentials with stored hashes, event/gate/staff-scoped online QR check-in, atomic duplicate rejection, refunded/revoked-ticket rejection, audited overrides, and a documented, limited offline-contingency policy.
-5. **Organizer and platform administration:** organizer onboarding/approval, event moderation, event-scoped staff, role/permission controls, ticket/order/support tools, sensitive-action approvals, cancellation/postponement workflows and audit history.
-6. **Communications and growth:** transactional email/in-app/SMS/WhatsApp queues with templates, consent, retries and receipts; waitlist invitations kept separate from purchases; promo codes; affiliate attribution and refund-adjusted commission records.
-7. **Reporting and operations:** tickets sold versus attendance, gross versus net proceeds, fees/refunds, conversion and sales pace, payment/reconciliation exceptions, failed notifications, monitoring, backup restore and privacy/retention operations.
-
-These are product targets, not features that the current draft-only phase claims to have shipped. Each phase requires its own permission checks, failure/recovery behavior and tests before it is enabled.
+Refund/transfer workflows, assigned event-staff scanning, offline admission, rotating QR codes, automated threat detection, privileged MFA and external security logging are not implemented. Cancellation handling requires operator review; do not treat this initial implementation as a complete production finance or event-staff system.
 
 ## Database setup
 
-Apply `supabase/TICKETING_CORE_MIGRATION.sql`, then `supabase/TICKETING_SECURITY_MIGRATION.sql`, then `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql` to the same Supabase project used by Online Bar Admin. The migrations use only the `ticketing_*` namespace, enable RLS, revoke direct browser access, and grant server-side access to `service_role` only where needed. Security case activity and security events are append-only to the application service role; case assignment/status changes run through an audited database function. The live operations journal records only allowlisted operational metadata. Review all SQL files and confirm the target project before applying them.
+Review all SQL files and confirm the target Supabase project before applying these migrations, in order:
 
-The platform must keep its service-role key server-side. API access to the Admin control centre requires an authenticated Online Bar owner or admin session. Do not put payment credentials in client-side environment variables.
+1. `supabase/TICKETING_CORE_MIGRATION.sql`
+2. `supabase/TICKETING_COMMERCE_MIGRATION.sql`
+3. `supabase/TICKETING_SECURITY_MIGRATION.sql`
+4. `supabase/TICKETING_LIVE_OPERATIONS_MIGRATION.sql`
 
-## Release gates before ticket sales
+The commerce migration extends the core schema and replaces gate check-in logic to reject cancelled, postponed, completed or out-of-window events. It uses only `ticketing_*` objects, enables RLS on its new table, revokes browser-role access and grants server-side access to `service_role`. Do not enable sales unless every migration has completed successfully.
 
-1. Add safe customer identity/order access, ticket wallet retrieval and complete the public event-page content and accessibility review.
-2. Implement atomic reservation creation, expiry/recovery, and order snapshots in server-verified checkout.
-3. Configure Daraja sandbox credentials and callback URL; validate signatures/transaction references, amount, currency, idempotency, duplicate callbacks, delayed callbacks, and reconciliation before production onboarding.
-4. Issue one unpredictable credential per paid admission only after verified payment; store a credential hash and deliver tickets idempotently.
-5. Add event-scoped staff roles and online gate scanning with atomic duplicate prevention, revoked/refunded-ticket rejection, and audited manual overrides.
-6. Complete refunds, transfer rules, transactional notifications and retries, financial reconciliation, monitoring, accessibility, privacy/retention policy, backup recovery and concurrency/authorization tests.
-7. Connect privileged MFA/session revocation, protected external security logging, rate limits, payment/ticket fraud alerts, tested backup restores and an exercised incident-response process. The Trust & Security Centre currently manages cases but does not detect attacks.
-8. Implement short-lived rotating ticket credentials only alongside authenticated ticket-wallet access, server-side validity checks and authorized online gate scanning; test clock drift, replay, race conditions and lost-connectivity recovery.
-9. Run the Midnight Society KE pilot in sandbox with a controlled event and staff. Do not enable production sales until every release-blocking test in the ticketing blueprint passes.
+The platform must keep its service-role key server-side. API access to admin functions requires an authenticated platform owner/admin session. Do not expose provider credentials or guest ticket credentials in client-side environment variables or logs.
 
-Money is stored as integer minor units with an explicit ISO currency. A checkout redirect, screenshot, or client-side status must never be treated as proof of payment.
+## Paystack sandbox setup and release
+
+Configure the following server-side variables from `.env.example` in deployment. Use a Paystack test secret while validating the sandbox:
+
+- `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true` — both must be deliberately enabled after acceptance checks; default is `false`.
+- `TICKETING_PAYMENT_MODE=test` and `PAYSTACK_SECRET_KEY=sk_test_...`.
+- `TICKETING_PUBLIC_URL=https://...` using the final HTTPS site URL.
+- `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL`.
+- `TICKETING_GUEST_SESSION_SECRET` and `TICKETING_TICKET_ENCRYPTION_KEY`, each a unique random secret of at least 32 characters. Back up the encryption secret securely; rotating it without re-encrypting ticket credentials will make existing wallet QR codes unreadable.
+- Existing Supabase URL and server-side service-role key.
+
+Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`. The public return page is `/tickets/complete`. The dashboard checks that the commerce schema is available before indicating sales are ready, and the checkout endpoint independently enforces the same checks.
+
+Before opening a real event, exercise sandbox purchases, duplicate and delayed callbacks, amount/currency/email mismatches, expired reservations, guest-link single use and expiry, email-delivery failure/retry, QR duplicate scans, wrong-event scans, and cancelled/out-of-window event admission. Keep both release switches off until all tests pass. Sandbox testing and production release approval are separate; never enable live Paystack keys without a separate production acceptance review.
+
+Money is stored as integer minor units with an explicit ISO currency. A checkout redirect, screenshot, or client-side status must never be treated as proof of payment. The gate scanner needs an active network connection and platform-admin access; do not represent it as offline or event-staff scanning.

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession, isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
+import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ function missingMigration(error: { code?: string; message?: string }) {
 }
 
 export async function GET() {
-  const { response } = await authorize();
+  const { session, response } = await authorize();
   if (response) return response;
   const database = createServerSupabaseClient();
   if (!database) return NextResponse.json({ error: 'Ticketing storage is not configured.' }, { status: 503 });
@@ -90,7 +91,9 @@ export async function GET() {
       events: eventCount.count || 0,
       tickets: ticketCount.count || 0,
       orders: orderCount.count || 0
-    }
+    },
+    salesReady: await isTicketingSalesReady(),
+    canPublish: session?.role.toLowerCase() === 'owner'
   }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
 }
 
@@ -108,6 +111,34 @@ export async function POST(request: Request) {
     body = await request.json() as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'A valid ticketing request is required.' }, { status: 400 });
+  }
+
+  if (body.action === 'set_event_status') {
+    const eventId = typeof body.eventId === 'string' ? body.eventId : '';
+    const status = typeof body.status === 'string' ? body.status : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)
+      || !['scheduled', 'on_sale', 'cancelled'].includes(status)) {
+      return NextResponse.json({ error: 'Choose a valid event and event status.' }, { status: 400 });
+    }
+    if (status === 'on_sale' && session?.role.toLowerCase() !== 'owner') {
+      return NextResponse.json({ error: 'Only the platform owner can open ticket sales.' }, { status: 403 });
+    }
+    if (status === 'on_sale' && !await isTicketingSalesReady()) {
+      return NextResponse.json({ error: 'Sales release is blocked. Configure the Paystack sandbox, ticket email, guest secrets, approved database migrations and release approval first.' }, { status: 503 });
+    }
+    const { data, error } = await database.rpc('ticketing_set_event_status', {
+      p_event_id: eventId,
+      p_status: status,
+      p_actor_email: session?.email || ''
+    });
+    if (error || !data) {
+      if (error?.code === 'P0001') return NextResponse.json({ error: error.message }, { status: 409 });
+      if (error?.code === 'P0002') return NextResponse.json({ error: 'The selected event was not found.' }, { status: 404 });
+      if (error?.code === '22023') return NextResponse.json({ error: 'The requested event status is invalid.' }, { status: 400 });
+      console.error('[TicketingAdmin] Could not update event status:', error);
+      return NextResponse.json({ error: 'The event status could not be updated.' }, { status: 503 });
+    }
+    return NextResponse.json({ event: data });
   }
 
   if (body.action === 'create_event') {

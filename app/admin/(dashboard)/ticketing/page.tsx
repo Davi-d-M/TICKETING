@@ -59,6 +59,8 @@ type TicketEvent = {
 type DashboardData = {
   events: TicketEvent[];
   totals: { events: number; tickets: number; orders: number };
+  salesReady: boolean;
+  canPublish: boolean;
 };
 
 const inputClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-[#17121e] px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/15';
@@ -146,7 +148,7 @@ function EventForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: (
         <button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-400 px-5 text-sm font-black text-[#170d18] hover:bg-orange-300 disabled:opacity-50">
           <CheckCircle2 size={16} /> {saving ? 'Saving draft…' : 'Save event draft'}
         </button>
-        <p className="self-center text-xs text-slate-400">Publishing and ticket sales remain disabled until checkout and payment verification are connected.</p>
+        <p className="self-center text-xs text-slate-400">Sales stay closed until the platform owner approves the release gates and opens a ready event.</p>
       </div>
     </form>
   );
@@ -208,9 +210,34 @@ function TierForm({ event, onCreated, onCancel }: { event: TicketEvent; onCreate
   );
 }
 
-function EventCard({ event, onRefresh }: { event: TicketEvent; onRefresh: () => void }) {
+function EventCard({ event, onRefresh, salesReady, canPublish }: {
+  event: TicketEvent;
+  onRefresh: () => void;
+  salesReady: boolean;
+  canPublish: boolean;
+}) {
   const [addingTier, setAddingTier] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState('');
   const allocated = event.ticket_types.reduce((total, tier) => total + tier.capacity, 0);
+  async function setStatus(status: 'scheduled' | 'on_sale') {
+    setStatusSaving(true);
+    setStatusError('');
+    try {
+      const response = await fetch('/api/admin/ticketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_event_status', eventId: event.id, status })
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'The event status could not be updated.');
+      onRefresh();
+    } catch (cause) {
+      setStatusError(cause instanceof Error ? cause.message : 'The event status could not be updated.');
+    } finally {
+      setStatusSaving(false);
+    }
+  }
   return (
     <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#17121e] shadow-xl shadow-black/20">
       <div className="border-b border-white/10 bg-gradient-to-r from-[#211326] via-[#251526] to-[#17121e] p-5 text-white sm:p-6">
@@ -243,11 +270,16 @@ function EventCard({ event, onRefresh }: { event: TicketEvent; onRefresh: () => 
             <p className="mt-1 text-xs text-slate-400">Price snapshots and allocations are isolated from Online Bar product inventory.</p>
           </div>
           {event.status === 'draft' || event.status === 'scheduled' ? (
-            <button type="button" onClick={() => setAddingTier(value => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs font-black text-orange-100 hover:bg-white/5">
-              <Plus size={14} /> Add tier
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setAddingTier(value => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs font-black text-orange-100 hover:bg-white/5">
+                <Plus size={14} /> Add tier
+              </button>
+              {canPublish && <button type="button" onClick={() => void setStatus('on_sale')} disabled={!salesReady || statusSaving || event.ticket_types.length === 0} title={!salesReady ? 'Release gates are not configured.' : event.ticket_types.length === 0 ? 'Add a ticket tier before opening sales.' : ''} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-orange-400 px-3 text-xs font-black text-[#170d18] hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-40">{statusSaving ? 'Updating…' : 'Open sales'}</button>}
+            </div>
           ) : <span className="text-xs font-semibold text-slate-500">Tiers locked for this event state</span>}
         </div>
+        {event.status === 'on_sale' && <button type="button" onClick={() => void setStatus('scheduled')} disabled={statusSaving} className="mt-3 min-h-9 rounded-lg border border-amber-200/20 px-3 text-xs font-bold text-amber-100 hover:bg-amber-100/5 disabled:opacity-50">{statusSaving ? 'Updating…' : 'Pause ticket sales'}</button>}
+        {statusError && <p role="alert" className="mt-3 text-xs text-red-200">{statusError}</p>}
         {event.ticket_types.length > 0 ? (
           <div className="mt-4 divide-y divide-white/10 rounded-xl border border-white/10">
             {event.ticket_types.map(tier => (
@@ -310,6 +342,7 @@ export default function TicketingPage() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">A haunted-by-design command centre for your events, ticket tiers and trust controls. Event ticket data stays isolated from drink orders, product stock and existing payouts.</p>
             </div>
             <div className="flex gap-2">
+              <Link href="/admin/ticketing/scan" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-orange-300/20 bg-orange-300/5 px-4 text-sm font-bold text-orange-100 transition hover:bg-orange-300/10"><ScanLine size={15} /> Gate scanner</Link>
               <Link href="/admin/ticketing/security" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/5 px-4 text-sm font-bold text-violet-100 transition hover:bg-violet-300/10"><ShieldAlert size={15} /> Trust centre</Link>
               <Link href="/admin/ticketing/live" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/5 px-4 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/10"><ScanLine size={15} /> Live operations</Link>
               <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 text-sm font-bold text-white transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
@@ -327,7 +360,7 @@ export default function TicketingPage() {
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-16 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
           <div className="relative flex items-start gap-3">
             <span className="rounded-xl border border-orange-300/20 bg-orange-300/10 p-2 text-orange-300"><AlertTriangle size={18} /></span>
-            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">Sales are locked for now</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">No live checkout</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">Payment verification, customer checkout, ticket issuance and gate scanning are not live. Events remain private drafts; no customer payment or ticket will be claimed without server verification.</p></div>
+            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">{data?.salesReady ? 'Sandbox checkout release gate is configured' : 'Sales are locked for now'}</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">{data?.salesReady ? 'Owner approval required' : 'No checkout enabled'}</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">Paystack checkout verifies payment server-side, then issues encrypted tickets and emails a one-time wallet link. Gate validation is online and admin-only. Open sales only after applying all four migrations, configuring sandbox keys and guest-email secrets, and completing end-to-end acceptance tests.</p></div>
           </div>
         </section>
 
@@ -341,20 +374,20 @@ export default function TicketingPage() {
             <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-violet-200">Foundation phase</span>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SecurityControl icon={BadgeCheck} title="Verified purchase" state="Not live" body="Provider callbacks, amount matching and payment reconciliation are not connected." />
-            <SecurityControl icon={KeyRound} title="Authentic ticket" state="Not live" body="Ticket credential issuance, customer delivery and revocation are not connected." />
-            <SecurityControl icon={ScanLine} title="Gate admission" state="Foundation" body="A database check-in primitive exists; there is no staff scanner or event-scoped access yet." />
+            <SecurityControl icon={BadgeCheck} title="Verified purchase" state="Foundation" body="Paystack signed webhooks and server verification confirm exact KES order amounts; unmatched payments are flagged for reconciliation." />
+            <SecurityControl icon={KeyRound} title="Authentic ticket" state="Foundation" body="Tickets issue only after verified payment; credentials are encrypted at rest and delivered through one-time guest wallet links." />
+            <SecurityControl icon={ScanLine} title="Gate admission" state="Foundation" body="Online QR scanning is available to platform admins with atomic duplicate-scan rejection; event-scoped staff access and offline mode are not enabled." />
             <SecurityControl icon={Fingerprint} title="Staff & oversight" state="Foundation" body="Draft and tier writes create audit entries; MFA, dual approval and a security case feed are not live." />
           </div>
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-white/5 bg-black/20 p-3 text-[11px] leading-5 text-slate-400">
             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-violet-300" />
-            <p>QR screenshots and payment messages are not proof of a valid ticket. Enable sales only after the payment, credential, admission and oversight controls are implemented and tested end-to-end.</p>
+            <p>QR screenshots and payment messages are not proof of a valid ticket. Keep the release gate off until sandbox callbacks, guest email delivery, scanner behavior and database migrations have been exercised end-to-end.</p>
           </div>
         </section>
 
         <section className="grid gap-3 md:grid-cols-3">
           <Feature icon={ShieldCheck} title="Isolated ticket records" body="Ticketing uses its own event, tier, reservation, payment, ticket, refund and check-in data." />
-          <Feature icon={Clock3} title="Reservation foundation" body="The database foundation supports short holds and inventory locking; public checkout is not connected." />
+          <Feature icon={Clock3} title="Inventory and payment tracking" body="Short inventory holds, Paystack payment attempts and ticket issuance are tracked in isolated ticketing tables and the live operations feed." />
           <Feature icon={Users} title="Admin-only workspace" body="Ticket administration is restricted to platform owners and admins." />
         </section>
 
@@ -375,7 +408,7 @@ export default function TicketingPage() {
               {!query && <button type="button" onClick={() => setAddingEvent(true)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-400 px-5 text-sm font-black text-[#170d18] hover:bg-orange-300"><Plus size={16} /> Create event draft</button>}
             </div>
           )}
-          {visibleEvents.map(event => <EventCard key={event.id} event={event} onRefresh={() => void load()} />)}
+          {visibleEvents.map(event => <EventCard key={event.id} event={event} onRefresh={() => void load()} salesReady={data?.salesReady || false} canPublish={data?.canPublish || false} />)}
         </section>
 
         <footer className="rounded-2xl border border-orange-300/15 bg-[#17121e] p-5">

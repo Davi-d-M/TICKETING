@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock3, Ghost, MapPin, ShieldAlert, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
+import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import PurchaseForm from '../PurchaseForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +65,7 @@ export default async function TicketEventPage({ params }: PageProps) {
   if (!event) notFound();
 
   const now = Date.now();
+  const salesReady = await isTicketingSalesReady();
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -left-36 top-24 h-96 w-96 rounded-full bg-orange-500/10 blur-[110px]" />
@@ -98,7 +101,7 @@ export default async function TicketEventPage({ params }: PageProps) {
                 const closed = ticketType.sales_end_at && new Date(ticketType.sales_end_at).getTime() <= now;
                 const schedule = notOpen
                   ? `Sales open ${formatEventDate(ticketType.sales_start_at!, event.timezone)}`
-                  : closed ? 'Sales window has ended' : 'Purchase unavailable';
+                  : closed ? 'Sales window has ended' : `${ticketType.remaining.toLocaleString('en-KE')} remaining`;
                 return (
                   <article key={ticketType.id} className="rounded-2xl border border-white/[0.08] bg-black/15 p-4 sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -110,10 +113,27 @@ export default async function TicketEventPage({ params }: PageProps) {
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
                       <span className="text-[10px] font-semibold text-slate-500">{schedule}</span>
-                      <button type="button" disabled aria-disabled="true" title="Online checkout and verified payment are not available yet" className="inline-flex min-h-10 cursor-not-allowed items-center gap-2 rounded-xl bg-white/10 px-4 text-xs font-black text-slate-400">
-                        {notOpen ? 'Not on sale yet' : closed ? 'Sales ended' : 'Purchases paused'}
-                      </button>
                     </div>
+                    {notOpen || closed || ticketType.remaining < ticketType.min_per_order ? (
+                      <p className="mt-3 text-xs font-bold text-slate-400">
+                        {notOpen ? 'Ticket sales have not opened.' : closed ? 'This ticket sale has ended.' : 'This ticket tier is sold out.'}
+                      </p>
+                    ) : salesReady ? (
+                      <PurchaseForm
+                        eventId={event.id}
+                        ticketTypeId={ticketType.id}
+                        name={ticketType.name}
+                        price={String(ticketType.price_minor)}
+                        currency={ticketType.currency.trim()}
+                        min={ticketType.min_per_order}
+                        max={Math.min(ticketType.max_per_order, ticketType.remaining, 20)}
+                        enabled={salesReady}
+                      />
+                    ) : (
+                      <p role="status" className="mt-3 rounded-xl border border-orange-300/15 bg-orange-950/20 p-3 text-xs leading-5 text-orange-100/80">
+                        Checkout is paused while Paystack, secure ticket email and server secrets are being configured.
+                      </p>
+                    )}
                   </article>
                 );
               })}
@@ -122,7 +142,7 @@ export default async function TicketEventPage({ params }: PageProps) {
 
           <aside className="space-y-4">
             <section role="status" className="rounded-3xl border border-orange-300/20 bg-gradient-to-br from-orange-950/35 to-[#1b1221] p-5 sm:p-6">
-              <div className="flex items-start gap-3"><span className="rounded-xl bg-orange-300/10 p-2 text-orange-200"><ShieldAlert size={18} /></span><div><h2 className="text-sm font-black text-orange-100">Purchases are not open</h2><p className="mt-2 text-xs leading-5 text-orange-50/70">This event listing is for discovery only. We have not connected verified M-Pesa checkout or ticket issuance, so no payment can be taken and no ticket can be issued here.</p></div></div>
+              <div className="flex items-start gap-3"><span className="rounded-xl bg-orange-300/10 p-2 text-orange-200"><ShieldAlert size={18} /></span><div><h2 className="text-sm font-black text-orange-100">{salesReady ? 'Secure Paystack checkout' : 'Purchases are not open'}</h2><p className="mt-2 text-xs leading-5 text-orange-50/70">{salesReady ? 'Payment is verified with Paystack on the server before tickets are issued. A one-time wallet link is sent to your purchase email.' : 'Ticket listings are visible, but checkout stays paused until Paystack, guest email delivery and the server-side security settings are configured.'}</p></div></div>
             </section>
             <section className="rounded-3xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
               <h2 className="text-sm font-black text-white">The real-ticket promise</h2>

@@ -1,0 +1,99 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import Link from 'next/link';
+import Image from 'next/image';
+
+type WalletData = {
+  order: { reference: string; buyerName: string; amountMinor: number; currency: string; paidAt: string | null };
+  event: { title: string; starts_at: string; ends_at: string; venue_name: string; venue_address: string; city: string; timezone: string; age_limit: number | null };
+  tickets: Array<{ id: string; reference: string; tier: string; status: string; issuedAt: string; checkedInAt: string | null; credential: string }>;
+};
+
+function localDate(value: string, timezone: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Date to be confirmed' : date.toLocaleString('en-KE', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: timezone
+  });
+}
+
+function GuestTicket({ ticket }: { ticket: WalletData['tickets'][number] }) {
+  const [qr, setQr] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void QRCode.toDataURL(ticket.credential, { errorCorrectionLevel: 'M', margin: 1, width: 280 })
+      .then(value => { if (active) setQr(value); })
+      .catch(() => { if (active) setError('Ticket QR could not be rendered on this device.'); });
+    return () => { active = false; };
+  }, [ticket.credential]);
+
+  return (
+    <article className="grid gap-5 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-200">{ticket.tier}</p>
+        <h2 className="mt-2 text-lg font-black">{ticket.reference}</h2>
+        <p className="mt-2 text-xs text-slate-400">Status: <span className="font-bold uppercase text-emerald-200">{ticket.status.replaceAll('_', ' ')}</span></p>
+        {ticket.checkedInAt && <p className="mt-1 text-xs text-slate-400">Admitted: {new Date(ticket.checkedInAt).toLocaleString('en-KE')}</p>}
+        <p className="mt-3 max-w-md text-[10px] leading-4 text-slate-500">Keep this code private. Entry is validated online, and each ticket can be admitted only once.</p>
+      </div>
+      <div className="mx-auto rounded-xl bg-white p-3">
+        {qr ? <Image src={qr} alt={`Entry QR for ticket ${ticket.reference}`} width={190} height={190} unoptimized /> : <div className="grid h-[190px] w-[190px] place-items-center text-center text-xs text-slate-500">{error || 'Preparing QR…'}</div>}
+      </div>
+    </article>
+  );
+}
+
+export default function Wallet() {
+  const [data, setData] = useState<WalletData | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/ticketing/wallet', { cache: 'no-store' });
+      const result = await response.json() as WalletData & { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Ticket wallet could not be loaded.');
+      setData(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Ticket wallet could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  async function logout() {
+    await fetch('/api/ticketing/wallet', { method: 'POST' });
+    setData(null);
+    setError('You have signed out of your ticket wallet.');
+  }
+
+  return (
+    <main className="min-h-screen bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-4xl space-y-5">
+        <header className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-orange-300/15 bg-gradient-to-br from-[#32172a] via-[#201320] to-[#120e18] p-6 sm:p-8">
+          <div><p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">ONLINE BAR · private wallet</p><h1 className="mt-3 text-3xl font-black">Your tickets</h1><p className="mt-2 text-xs text-slate-300">Only share your entry QR with gate staff.</p></div>
+          {data && <button type="button" onClick={() => void logout()} className="min-h-10 rounded-xl border border-white/15 px-4 text-xs font-bold hover:bg-white/5">Sign out</button>}
+        </header>
+        {loading && <p role="status" className="rounded-2xl border border-white/10 bg-[#17121e] p-6 text-sm text-slate-300">Loading your secure wallet…</p>}
+        {error && !loading && <div role="alert" className="rounded-2xl border border-orange-300/20 bg-[#17121e] p-6"><p className="text-sm text-slate-200">{error}</p>{!data && <Link href="/tickets/access" className="mt-4 inline-block text-xs font-bold text-orange-200">Request a fresh secure wallet link</Link>}</div>}
+        {data && (
+          <>
+            <section className="rounded-2xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
+              <p className="text-xs font-black uppercase text-orange-200">{data.event.title}</p>
+              <p className="mt-2 text-sm">{localDate(data.event.starts_at, data.event.timezone)}</p>
+              <p className="mt-1 text-xs text-slate-400">{data.event.venue_name}{data.event.venue_address ? ` · ${data.event.venue_address}` : ''}, {data.event.city}</p>
+              <p className="mt-3 text-[10px] text-slate-500">Order {data.order.reference} · {new Intl.NumberFormat('en-KE', { style: 'currency', currency: data.order.currency.trim() }).format(Number(data.order.amountMinor) / 100)}</p>
+            </section>
+            {data.tickets.length ? data.tickets.map(ticket => <GuestTicket key={ticket.id} ticket={ticket} />) : <p className="rounded-2xl border border-amber-200/20 bg-amber-950/20 p-5 text-sm text-amber-100">Payment is confirmed, but tickets are not yet available. Contact support and provide order reference {data.order.reference}.</p>}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
