@@ -63,4 +63,14 @@ Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`
 
 Before opening a real event, enroll the admin authenticator and exercise sandbox purchases, duplicate and delayed callbacks, amount/currency/email mismatches, expired reservations, guest-link single use and expiry, email-delivery failure/retry, public verification privacy, expired/replayed rotating QR codes, simultaneous scans and request replay after a timeout, wrong-event/unassigned-staff scans, rate limits, revoked/refunded credentials, transfer approval/rejection, replacement-ticket access, and cancelled/out-of-window event admission. Keep both release switches off until all tests pass. Sandbox testing and production release approval are separate; never enable live Paystack keys without a separate production acceptance review.
 
+### First event and operating sequence
+
+1. Sign in at `/admin/login`; complete password and authenticator enrollment.
+2. Open `/admin/ticketing`, create a private event draft, and enter only organizer-confirmed event and venue information.
+3. Add ticket tiers and release waves with confirmed KES pricing, inventory, benefits and opening rules. Assign gate staff and a named gate from the scanner workspace.
+4. Complete the sandbox acceptance checklist above using Paystack test credentials. Confirm the buyer receives the one-time wallet email, sees the issued ticket, and the assigned scanner accepts the first scan but rejects a duplicate.
+5. Only after the owner approves the production release, set the release switches, open the approved event and verify sales and scans in Live Operations. Orders and earnings remain in the isolated Ticketing ledger.
+
+The public site intentionally shows no event until an approved event has a ticket wave open for sale. A scheduled ticket-wave opening controls ticket sales; it is not the separate Midnight Society member-pass countdown.
+
 Money is stored as integer minor units with an explicit ISO currency. A checkout redirect, screenshot, or client-side status must never be treated as proof of payment. The gate scanner needs an active network connection and platform-admin access; do not represent it as offline or event-staff scanning.

@@ -18,7 +18,7 @@ This repository is the standalone Next.js host for Midnight Society KE Ticketing
 
 Import `Davi-d-M/TICKETING` into Vercel and use the repository root as the Root Directory. Vercel detects Next.js from `package.json`; use `npm run build` as the build command and leave the output directory at its default. Production and Preview builds succeed without database credentials, but event listings will explain that setup is pending.
 
-Configure these server-only variables in the Vercel project before enabling the admin or database-backed pages:
+Configure these server-only variables in the Vercel project before enabling the admin or database-backed pages. The complete commerce and release-gate variable list, including test-mode settings, is in [ticketing/README.md](./ticketing/README.md); do not enable live sales before its acceptance checklist passes.
 
 - `TICKETING_ADMIN_EMAIL` — dedicated Ticketing administrator email.
 - `TICKETING_ADMIN_PASSWORD` — a unique high-entropy password.

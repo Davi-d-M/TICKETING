@@ -879,11 +879,41 @@ export default function TicketingPage() {
           </div>
         </header>
 
+        <section aria-labelledby="ticketing-quick-start" className="rounded-2xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
+          <div className="mb-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-200">Quick start</p>
+            <h2 id="ticketing-quick-start" className="mt-1 text-lg font-black text-white">Run ticketing in four steps</h2>
+            <p className="mt-1 text-xs text-slate-400">Ticket orders, payment records and guest ticket delivery stay separate from shop orders.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <button type="button" onClick={() => setAddingEvent(true)} className="rounded-xl border border-white/10 bg-white/[0.025] p-4 text-left transition hover:border-orange-200/25 hover:bg-white/[0.05]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-200">1 · Event</span>
+              <span className="mt-1 block text-sm font-black text-white">{data?.totals.events ? `Review ${data.totals.events} event${data.totals.events === 1 ? '' : 's'}` : 'Create your event'}</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-400">Save the confirmed date, venue and event details as a private draft.</span>
+            </button>
+            <button type="button" onClick={() => document.getElementById('ticket-event-vault')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="rounded-xl border border-white/10 bg-white/[0.025] p-4 text-left transition hover:border-orange-200/25 hover:bg-white/[0.05]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-200">2 · Tickets</span>
+              <span className="mt-1 block text-sm font-black text-white">Set price &amp; ticket waves</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-400">Choose admission, KES price, allocation, benefits and sales-open time.</span>
+            </button>
+            <Link href="/admin/ticketing/scan" className="rounded-xl border border-white/10 bg-white/[0.025] p-4 transition hover:border-orange-200/25 hover:bg-white/[0.05]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-200">3 · Gate team</span>
+              <span className="mt-1 block text-sm font-black text-white">Assign staff &amp; gates</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-400">Create named staff access and scope each scanner to its event and gate.</span>
+            </Link>
+            <Link href="/admin/ticketing/live" className="rounded-xl border border-white/10 bg-white/[0.025] p-4 transition hover:border-orange-200/25 hover:bg-white/[0.05]">
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-200">4 · Orders &amp; entry</span>
+              <span className="mt-1 block text-sm font-black text-white">Monitor payments &amp; scans</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-400">Follow verified orders, ticket issuance, guest-wallet delivery and gate check-ins.</span>
+            </Link>
+          </div>
+        </section>
+
         <section role="status" className="relative overflow-hidden rounded-2xl border border-orange-400/25 bg-gradient-to-r from-orange-950/50 via-[#20131f] to-[#171220] p-4 sm:p-5">
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-16 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
           <div className="relative flex items-start gap-3">
             <span className="rounded-xl border border-orange-300/20 bg-orange-300/10 p-2 text-orange-300"><AlertTriangle size={18} /></span>
-            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">{data?.salesReady ? 'Sandbox checkout release gate is configured' : 'Sales are locked for now'}</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">{data?.salesReady ? 'Owner approval required' : 'No checkout enabled'}</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">Paystack checkout verifies payment server-side, then issues encrypted tickets and emails a one-time wallet link. Gate staff use individually authenticated, event-and-gate-assigned scanner accounts. Open sales only after applying all five migrations, configuring provider, email, guest and gate secrets, and completing end-to-end acceptance tests.</p></div>
+            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">{data?.salesReady ? 'Checkout configuration passes its release checks' : 'Sales are locked for now'}</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">{data?.salesReady ? 'Sandbox rehearsal still required' : 'Configuration required'}</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">The implemented order flow reserves inventory, initializes Paystack, verifies payment server-side, issues encrypted tickets and emails one-time wallet access. Gate staff scan online with event-and-gate-scoped accounts. Keep both release switches off until all nine migrations, sandbox credentials, email delivery, admin MFA and the full payment-to-wallet-to-gate rehearsal are verified. See the Trust Centre for live schema and configuration checks.</p><Link href="/admin/ticketing/security" className="mt-2 inline-flex text-xs font-black text-orange-100 underline underline-offset-2">Open Trust Centre readiness checks</Link></div>
           </div>
         </section>
 
@@ -917,7 +947,7 @@ export default function TicketingPage() {
         {notice && <p role="status" className="rounded-xl border border-orange-300/20 bg-orange-300/10 p-3 text-sm text-orange-100">{notice}</p>}
         {addingEvent && <EventForm onCancel={() => setAddingEvent(false)} onCreated={message => { setAddingEvent(false); setNotice(message || 'Event draft created.'); void load(); }} />}
 
-        <section className="space-y-4">
+        <section id="ticket-event-vault" className="scroll-mt-6 space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><div className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300">Event vault</div><h2 className="mt-1 text-xl font-black tracking-tight text-white">Your events</h2><p className="mt-1 text-sm text-slate-400">Create private drafts, then add ticket tiers and allocations.</p></div>
             <label className="relative block w-full sm:w-72"><span className="sr-only">Search events</span><input value={query} onChange={event => setQuery(event.target.value)} className={inputClass} placeholder="Search events, venues or cities" /></label>
@@ -936,7 +966,7 @@ export default function TicketingPage() {
         </section>
 
         <footer className="rounded-2xl border border-orange-300/15 bg-[#17121e] p-5">
-          <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 shrink-0 text-orange-300" size={19} /><div><p className="text-sm font-black text-white">Release gate: not cleared</p><p className="mt-1 text-xs leading-5 text-slate-400">Do not publish or accept customer payments until server-verified provider callbacks, atomic reservation expiry, idempotent ticket issuance, customer ownership checks, refund reconciliation and online gate validation are implemented and tested.</p></div><ArrowUpRight className="ml-auto hidden text-slate-500 sm:block" size={16} /></div>
+          <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 shrink-0 text-orange-300" size={19} /><div><p className="text-sm font-black text-white">Release gate: acceptance test still outstanding</p><p className="mt-1 text-xs leading-5 text-slate-400">The server-side payment, reservation, wallet and online scanner flows are implemented. Before live sales, verify the full journey in Paystack test mode: successful and failed callback, ticket in the guest wallet, email access, first gate scan and duplicate-scan rejection. Also verify refund and reconciliation handling. Do not test with live payment keys.</p></div><ArrowUpRight className="ml-auto hidden text-slate-500 sm:block" size={16} /></div>
         </footer>
       </div>
     </main>
