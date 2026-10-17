@@ -4,6 +4,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 import Image from 'next/image';
+import TicketingBrand from '../TicketingBrand';
 import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 
 type WalletData = {
@@ -158,6 +159,8 @@ export default function Wallet() {
   }
 
   return (
+    <>
+    <TicketingBrand />
     <main className="min-h-screen bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <style>{`@media print {
         body * { visibility: hidden !important; }
@@ -200,5 +203,6 @@ export default function Wallet() {
         )}
       </div>
     </main>
+    </>
   );
 }

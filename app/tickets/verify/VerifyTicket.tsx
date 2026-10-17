@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import TicketingBrand from '../TicketingBrand';
 
 type Verification = {
   verified: boolean;
@@ -44,6 +45,8 @@ export default function VerifyTicket({ initialReference = '' }: { initialReferen
       : { label: 'NOT ADMISSIBLE', style: 'border-red-300/20 bg-red-950/30 text-red-100' };
 
   return (
+    <>
+    <TicketingBrand />
     <main className="min-h-screen bg-[#0d0a12] px-4 py-14 text-white sm:px-6">
       <section className="mx-auto max-w-xl rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 shadow-2xl sm:p-10">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">MIDNIGHT SOCIETY KE</p>
@@ -71,5 +74,6 @@ export default function VerifyTicket({ initialReference = '' }: { initialReferen
         )}
       </section>
     </main>
+    </>
   );
 }

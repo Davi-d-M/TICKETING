@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import TicketingBrand from '../TicketingBrand';
 
 export default function ClaimTicketAccess({ token }: { token: string }) {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function ClaimTicketAccess({ token }: { token: string }) {
   }
 
   return (
+    <>
+    <TicketingBrand />
     <main className="min-h-screen bg-[#0d0a12] px-4 py-16 text-white">
       <section className="mx-auto max-w-lg rounded-3xl border border-orange-300/15 bg-[#17121e] p-8 text-center">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">Secure guest access</p>
@@ -38,5 +41,6 @@ export default function ClaimTicketAccess({ token }: { token: string }) {
         </button>
       </section>
     </main>
+    </>
   );
 }

@@ -7,6 +7,7 @@ import { getPublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
 import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 import PurchaseForm from '../PurchaseForm';
+import TicketingBrand from '../TicketingBrand';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,8 @@ export default async function TicketEventPage({ params }: PageProps) {
 
   if (!result.ok) {
     return (
+      <>
+      <TicketingBrand />
       <main className="min-h-[70vh] bg-[#0d0a12] px-4 py-16 text-white sm:px-6">
         <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-[#17121e] p-8 text-center">
           <Ghost className="mx-auto text-orange-300" size={30} />
@@ -60,6 +63,7 @@ export default async function TicketEventPage({ params }: PageProps) {
           <Link href="/tickets" className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-orange-400 px-5 text-sm font-black text-[#170d18]">Back to events</Link>
         </div>
       </main>
+      </>
     );
   }
 
@@ -70,6 +74,8 @@ export default async function TicketEventPage({ params }: PageProps) {
   const salesReady = await isTicketingSalesReady();
   const mapLinks = getVenueMapLinks(event);
   return (
+    <>
+    <TicketingBrand />
     <main className="relative min-h-screen overflow-hidden bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -left-36 top-24 h-96 w-96 rounded-full bg-orange-500/10 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-32 top-[34rem] h-96 w-96 rounded-full bg-violet-600/10 blur-[110px]" />
@@ -209,6 +215,7 @@ export default async function TicketEventPage({ params }: PageProps) {
         <footer className="border-t border-white/[0.08] pt-5 text-center text-[10px] text-slate-500">Midnight Society KE · No tricks, no fake confirmations.</footer>
       </div>
     </main>
+    </>
   );
 }
 

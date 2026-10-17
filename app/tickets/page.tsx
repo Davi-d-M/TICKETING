@@ -4,6 +4,8 @@ import type { Metadata } from 'next';
 import { CalendarDays, ChevronRight, Clock3, Ghost, MapPin, Navigation, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvents, type PublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
 import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
+import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import TicketingBrand from './TicketingBrand';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +82,14 @@ function EventCard({ event }: { event: PublicTicketEvent }) {
 }
 
 export default async function TicketDiscoveryPage() {
-  const result = await getPublicTicketEvents();
+  const [result, salesReady] = await Promise.all([
+    getPublicTicketEvents(),
+    isTicketingSalesReady()
+  ]);
 
   return (
+    <>
+    <TicketingBrand />
     <main className="relative min-h-screen overflow-hidden bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-24 h-[28rem] w-[28rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-40 top-[38rem] h-[28rem] w-[28rem] rounded-full bg-violet-600/10 blur-[120px]" />
@@ -105,7 +112,16 @@ export default async function TicketDiscoveryPage() {
 
         <section role="status" className="flex items-start gap-3 rounded-2xl border border-orange-300/20 bg-orange-950/25 p-4">
           <ShieldCheck className="mt-0.5 shrink-0 text-orange-200" size={18} />
-          <div><p className="text-sm font-black text-orange-100">Checkout is still being secured</p><p className="mt-1 text-xs leading-5 text-orange-50/70">This page only lists approved-organizer events marked on sale. Online checkout and verified M-Pesa payment are not live yet, so ticket purchases cannot be completed here.</p></div>
+          <div>
+            <p className="text-sm font-black text-orange-100">{salesReady ? 'Official checkout safeguards are configured' : 'Ticket checkout is temporarily unavailable'}</p>
+            <p className="mt-1 text-xs leading-5 text-orange-50/70">
+              {salesReady
+                ? result.ok && result.events.length
+                  ? 'Only events officially opened for sale are listed. Paystack payments are checked server-side before tickets are issued.'
+                  : 'Checkout configuration checks pass, but there are no approved events open for sale right now. Payment is verified with Paystack before any ticket is issued.'
+                : 'Events are listed only when approved and on sale. Purchases stay disabled until the payment, secure ticket delivery and required server checks are configured.'}
+            </p>
+          </div>
         </section>
 
         <section className="space-y-5">
@@ -132,5 +148,6 @@ export default async function TicketDiscoveryPage() {
         </footer>
       </div>
     </main>
+    </>
   );
 }

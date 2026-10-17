@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import TicketingBrand from '../TicketingBrand';
 
 export default function RequestAccess() {
   const [reference, setReference] = useState('');
@@ -35,6 +36,8 @@ export default function RequestAccess() {
   }
 
   return (
+    <>
+    <TicketingBrand />
     <main className="min-h-screen bg-[#0d0a12] px-4 py-16 text-white">
       <form onSubmit={submit} className="mx-auto max-w-lg rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 sm:p-9">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">Secure guest recovery</p>
@@ -48,5 +51,6 @@ export default function RequestAccess() {
         <Link href="/tickets" className="mt-6 inline-block text-xs font-bold text-orange-200">Back to events</Link>
       </form>
     </main>
+    </>
   );
 }

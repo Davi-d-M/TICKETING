@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import TicketingBrand from '../TicketingBrand';
 
 type Result = { success?: boolean; email?: string; orderReference?: string; emailSent?: boolean; error?: string };
 
@@ -54,6 +55,8 @@ export default function CompletePayment({ reference }: { reference: string }) {
   }
 
   return (
+    <>
+    <TicketingBrand />
     <main className="min-h-screen bg-[#0d0a12] px-4 py-16 text-white">
       <section className="mx-auto max-w-xl rounded-3xl border border-orange-300/15 bg-[#17121e] p-7 text-center shadow-2xl sm:p-10">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-200">Midnight Society KE Ticketing</p>
@@ -77,5 +80,6 @@ export default function CompletePayment({ reference }: { reference: string }) {
         <div className="mt-7"><Link href="/tickets" className="text-xs font-bold text-orange-200 hover:text-white">Back to events</Link></div>
       </section>
     </main>
+    </>
   );
 }
