@@ -2,6 +2,8 @@
 
 The standalone Ticketing application is managed at `/admin/ticketing` and serves event discovery at `/tickets`. It stores data in isolated `ticketing_*` Supabase tables; it does not use drink-order, product inventory, merchant payout or waitlist tables.
 
+The customer event pages, guest ticket wallets and wallet-access emails use the published color mode managed from Online Bar Admin → Ticketing → Customer ticket colors. This app reads only the public theme identifier from the shared `settings` table; it cannot publish or change the setting. Set `NEXT_PUBLIC_SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` to the exact Supabase project configured in Online Bar Admin. If this app points at another project, customer pages use the default Midnight palette instead of the admin selection. Ticket QR codes stay black on white for reliable scanning.
+
 ## Implemented flows
 
 - Owner/admin event and tier management, including venue arrival guidance, fixed per-ticket fees, ticket benefits, capacity, sale windows and promotion codes. The platform owner can adjust the service fee while sales are open; future checkouts use the new fee while existing order totals stay unchanged. Tier terms lock once an order exists, and venue changes lock after sales open. Only the platform owner can open ticket sales. Opening sales requires future event dates, an active paid tier, a verified map destination and explicit server-side release approvals.

@@ -2,6 +2,8 @@ import 'server-only';
 
 import { createHash, createHmac, randomBytes, timingSafeEqual, createCipheriv, createDecipheriv } from 'node:crypto';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
+import { defaultTicketTheme } from '@/lib/ticketing/theme';
+import { getPublishedTicketTheme } from '@/lib/ticketing/theme.server';
 
 type PaystackTransaction = {
   status?: string;
@@ -48,6 +50,26 @@ function guestSecret() {
   const secret = process.env.TICKETING_GUEST_SESSION_SECRET?.trim();
   if (!secret || secret.length < 32) throw new Error('Guest ticket access is not configured.');
   return secret;
+}
+
+async function ticketEmailAccent() {
+  try {
+    const theme = await getPublishedTicketTheme();
+    return {
+      midnight: '#fb923c',
+      'official-white': '#ea580c',
+      'royal-violet': '#5b21b6',
+      emerald: '#065f46'
+    }[theme];
+  } catch (cause) {
+    console.error('[TicketingEmail] Could not load the published ticket theme; using the default email accent.', cause);
+    return {
+      midnight: '#fb923c',
+      'official-white': '#ea580c',
+      'royal-violet': '#5b21b6',
+      emerald: '#065f46'
+    }[defaultTicketTheme];
+  }
 }
 
 export async function isTicketingSalesReady() {
@@ -344,6 +366,7 @@ export async function sendGuestTicketAccess(orderReference: string, email: strin
   if (!from || !apiKey) throw new Error('Guest ticket email delivery is not configured.');
 
   const claimUrl = `${process.env.TICKETING_PUBLIC_URL!.replace(/\/$/, '')}/tickets/claim?token=${encodeURIComponent(token)}`;
+  const accent = await ticketEmailAccent();
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -352,7 +375,7 @@ export async function sendGuestTicketAccess(orderReference: string, email: strin
       to: [email.trim().toLowerCase()],
       subject: 'Your Midnight Society KE ticket access link',
       text: `Your payment has been verified. Open this one-time link within 30 minutes to access your tickets: ${claimUrl}`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1>Your tickets are ready</h1><p>Payment has been verified. Use the secure, one-time link below within 30 minutes to open your ticket wallet.</p><p><a href="${claimUrl}" style="display:inline-block;background:#fbbf24;color:#211326;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open ticket wallet</a></p><p>If you did not make this purchase, you can ignore this email.</p></div>`
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1 style="color:${accent}">Your tickets are ready</h1><p>Payment has been verified. Use the secure, one-time link below within 30 minutes to open your ticket wallet.</p><p><a href="${claimUrl}" style="display:inline-block;background:${accent};color:#ffffff;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open ticket wallet</a></p><p>If you did not make this purchase, you can ignore this email.</p></div>`
     }),
     cache: 'no-store'
   });
@@ -383,6 +406,7 @@ export async function sendTransferredTicketAccess(ticketReference: string, email
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!from || !apiKey) throw new Error('Guest ticket email delivery is not configured.');
   const claimUrl = `${process.env.TICKETING_PUBLIC_URL!.replace(/\/$/, '')}/tickets/claim?token=${encodeURIComponent(token)}`;
+  const accent = await ticketEmailAccent();
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -391,7 +415,7 @@ export async function sendTransferredTicketAccess(ticketReference: string, email
       to: [email.trim().toLowerCase()],
       subject: 'Your transferred Midnight Society KE ticket',
       text: `The ticket transfer has been approved. Ticket reference: ${ticketReference}. Open this one-time link within 30 minutes to access your ticket: ${claimUrl}`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1>Your ticket transfer is approved</h1><p>Ticket reference: <strong>${ticketReference}</strong></p><p>Use this secure, one-time link within 30 minutes to open your transferred ticket.</p><p><a href="${claimUrl}" style="display:inline-block;background:#fbbf24;color:#211326;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open transferred ticket</a></p></div>`
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#211326"><h1 style="color:${accent}">Your ticket transfer is approved</h1><p>Ticket reference: <strong>${ticketReference}</strong></p><p>Use this secure, one-time link within 30 minutes to open your transferred ticket.</p><p><a href="${claimUrl}" style="display:inline-block;background:${accent};color:#ffffff;padding:14px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open transferred ticket</a></p></div>`
     }),
     cache: 'no-store'
   });

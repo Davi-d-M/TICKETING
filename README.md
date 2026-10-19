@@ -20,6 +20,8 @@ Import `Davi-d-M/TICKETING` into Vercel and use the repository root as the Root 
 
 Configure these server-only variables in the Vercel project before enabling the admin or database-backed pages. The complete commerce and release-gate variable list, including test-mode settings, is in [ticketing/README.md](./ticketing/README.md); do not enable live sales before its acceptance checklist passes.
 
+For Online Bar Admin to control the customer ticket palette, configure `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` here to the **same Supabase project** configured in the Online Bar Admin deployment. Online Bar Admin remains the only place that publishes `settings.key = 'ticketing_theme'`; this app reads that published setting for event pages, ticket wallets and access emails. Ticketing continues to keep its own records in `ticketing_*` tables. The customer theme API is read-only and does not expose database credentials.
+
 - `TICKETING_ADMIN_EMAIL` — dedicated Ticketing administrator email.
 - `TICKETING_ADMIN_PASSWORD` — a unique high-entropy password.
 - `TICKETING_SESSION_SECRET` — independent random value of at least 32 characters.

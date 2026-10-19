@@ -30,3 +30,118 @@ textarea,
 select {
   font: inherit;
 }
+
+.ticket-theme-scope {
+  --ticket-page: #0d0a12;
+  --ticket-panel: #17121e;
+  --ticket-panel-muted: #110e17;
+  --ticket-hero: linear-gradient(135deg, #39172a, #261329 58%, #15101d);
+  --ticket-text: #f8fafc;
+  --ticket-copy: #cbd5e1;
+  --ticket-muted: #94a3b8;
+  --ticket-border: rgb(255 255 255 / 12%);
+  --ticket-accent: #fdba74;
+  --ticket-accent-strong: #fb923c;
+  --ticket-accent-soft: rgb(251 146 60 / 12%);
+  --ticket-action-text: #170d18;
+  min-height: 100vh;
+  background: var(--ticket-page);
+  color: var(--ticket-text);
+  color-scheme: dark;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.ticket-theme-scope[data-ticket-theme='official-white'] {
+  --ticket-page: #f8fafc;
+  --ticket-panel: #ffffff;
+  --ticket-panel-muted: #f1f5f9;
+  --ticket-hero: linear-gradient(135deg, #fff7ed, #ffffff 58%, #fffbeb);
+  --ticket-text: #0f172a;
+  --ticket-copy: #475569;
+  --ticket-muted: #64748b;
+  --ticket-border: #e2e8f0;
+  --ticket-accent: #c2410c;
+  --ticket-accent-strong: #ea580c;
+  --ticket-accent-soft: #fff7ed;
+  --ticket-action-text: #ffffff;
+  color-scheme: light;
+}
+
+.ticket-theme-scope[data-ticket-theme='royal-violet'] {
+  --ticket-page: #f5f3ff;
+  --ticket-panel: #ffffff;
+  --ticket-panel-muted: #f5f3ff;
+  --ticket-hero: linear-gradient(135deg, #ede9fe, #ffffff 58%, #f5f3ff);
+  --ticket-text: #2e1065;
+  --ticket-copy: #5b4b78;
+  --ticket-muted: #77688f;
+  --ticket-border: #ddd6fe;
+  --ticket-accent: #6d28d9;
+  --ticket-accent-strong: #5b21b6;
+  --ticket-accent-soft: #f5f3ff;
+  --ticket-action-text: #ffffff;
+  color-scheme: light;
+}
+
+.ticket-theme-scope[data-ticket-theme='emerald'] {
+  --ticket-page: #ecfdf5;
+  --ticket-panel: #ffffff;
+  --ticket-panel-muted: #f0fdf4;
+  --ticket-hero: linear-gradient(135deg, #d1fae5, #ffffff 58%, #ecfdf5);
+  --ticket-text: #064e3b;
+  --ticket-copy: #3f6359;
+  --ticket-muted: #5b7a70;
+  --ticket-border: #a7f3d0;
+  --ticket-accent: #047857;
+  --ticket-accent-strong: #065f46;
+  --ticket-accent-soft: #ecfdf5;
+  --ticket-action-text: #ffffff;
+  color-scheme: light;
+}
+
+.ticket-theme-scope > header {
+  border-color: var(--ticket-border) !important;
+  background: var(--ticket-page) !important;
+  color: var(--ticket-text);
+}
+
+.ticket-theme-scope :is([class~="bg-[#0d0a12]"], [class~="bg-[#0b0a0f]"]) {
+  background-color: var(--ticket-page) !important;
+}
+
+.ticket-theme-scope :is([class~="bg-[#17121e]"], [class~="bg-[#100d17]"]) {
+  background-color: var(--ticket-panel) !important;
+}
+
+.ticket-theme-scope :is([class~="bg-black/20"], [class~="bg-black/15"]) {
+  background-color: var(--ticket-panel-muted) !important;
+}
+
+.ticket-theme-scope :is([class*="from-[#39172a]"], [class*="from-[#32172a]"]) {
+  background: var(--ticket-hero) !important;
+}
+
+.ticket-theme-scope :is([class~="bg-orange-400"], [class~="bg-orange-500"]) {
+  background-color: var(--ticket-accent-strong) !important;
+  color: var(--ticket-action-text) !important;
+}
+
+.ticket-theme-scope :is([class~="text-white"], [class~="text-white/90"], [class~="text-white/80"], [class~="text-white/65"], [class~="text-slate-100"], [class~="text-slate-200"], [class~="text-slate-300"], [class~="text-slate-400"]) {
+  color: var(--ticket-text) !important;
+}
+
+.ticket-theme-scope :is([class~="text-slate-500"], [class~="text-slate-600"]) {
+  color: var(--ticket-copy) !important;
+}
+
+.ticket-theme-scope :is([class~="text-orange-100"], [class~="text-orange-200"], [class~="text-orange-300"], [class~="text-orange-400"], [class~="text-amber-100"], [class~="text-amber-200"], [class~="text-amber-300"], [class~="text-violet-200"]) {
+  color: var(--ticket-accent) !important;
+}
+
+.ticket-theme-scope :is([class*="border-white/"], [class*="border-orange-"], [class*="border-amber-"]) {
+  border-color: var(--ticket-border) !important;
+}
+
+.ticket-theme-scope .ticket-wallet-qr {
+  background: #fff !important;
+}
