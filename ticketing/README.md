@@ -15,7 +15,7 @@ The customer event pages, guest ticket wallets and wallet-access emails use the 
 - Ticket holders can request a transfer. The original stays active until owner review; approval revokes its credential and issues a replacement to the recipient. Rejection leaves the original active. Approved recipients can request a fresh wallet link with the transferred-ticket reference and their email.
 - Sales default to disabled. No payment provider, database or email credentials are committed to this repository.
 
-Privileged admin access requires authenticator-app TOTP after password login. The Security Center reports server configuration and schema readiness; it does not detect attacks automatically or verify external security logging. Backup scheduling and restore drills require independent verification in Supabase. Cancellation handling requires operator review; do not treat this implementation as a complete production finance or event-staff system. All transfers require owner approval; VIP/complimentary/flagged ticket categories do not currently have separate escalation rules.
+Ticketing administration is managed inside the authenticated Online Bar Admin workspace at `/lord/ticketing`, using its existing admin session and MFA. The Vercel customer app redirects `/admin` to that Online Bar workspace and does not require a second administrator account. The Security Center reports server configuration and schema readiness; it does not detect attacks automatically or verify external security logging. Backup scheduling and restore drills require independent verification in Supabase. Cancellation handling requires operator review; do not treat this implementation as a complete production finance or event-staff system. All transfers require owner approval; VIP/complimentary/flagged ticket categories do not currently have separate escalation rules.
 
 ## Database setup
 
@@ -57,18 +57,17 @@ Configure the following server-side variables from `.env.example` in deployment.
 - `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL`.
 - `TICKETING_GUEST_SESSION_SECRET` and `TICKETING_TICKET_ENCRYPTION_KEY`, each a unique random secret of at least 32 characters. Back up the encryption secret securely; rotating it without re-encrypting ticket credentials will make existing wallet QR codes unreadable.
 - `TICKETING_GATE_SESSION_SECRET` — a unique random secret of at least 32 characters for gate staff sessions; keep it separate from other session secrets.
-- `TICKETING_MFA_ENCRYPTION_KEY` — an independent random value of at least 32 characters used to encrypt the admin authenticator secret. Keep a secure recovery copy; losing or rotating it without re-enrollment disables admin MFA verification.
 - `TICKETING_QR_SIGNING_SECRET` — an independent random value of at least 32 characters for signed five-minute ticket QR credentials. Keep it separate from all session and encryption keys.
 - Existing Supabase URL and server-side service-role key.
 
-Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`. The public return page is `/tickets/complete`. The dashboard checks that the commerce schema is available before indicating sales are ready, and the checkout endpoint independently enforces the same checks.
+The Online Bar Admin deployment owns administrator password/session settings and `TICKETING_MFA_ENCRYPTION_KEY`; do not create a separate Ticketing admin account in Vercel. Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`. The public return page is `/tickets/complete`. The dashboard checks that the commerce schema is available before indicating sales are ready, and the checkout endpoint independently enforces the same checks.
 
 Before opening a real event, enroll the admin authenticator and exercise sandbox purchases, duplicate and delayed callbacks, amount/currency/email mismatches, expired reservations, guest-link single use and expiry, email-delivery failure/retry, public verification privacy, expired/replayed rotating QR codes, simultaneous scans and request replay after a timeout, wrong-event/unassigned-staff scans, rate limits, revoked/refunded credentials, transfer approval/rejection, replacement-ticket access, and cancelled/out-of-window event admission. Keep both release switches off until all tests pass. Sandbox testing and production release approval are separate; never enable live Paystack keys without a separate production acceptance review.
 
 ### First event and operating sequence
 
-1. Sign in at `/admin/login`; complete password and authenticator enrollment.
-2. Open `/admin/ticketing`, create a private event draft, and enter only organizer-confirmed event and venue information.
+1. Sign in through Online Bar Admin and open `/lord/ticketing`; complete the platform's required authenticator enrollment.
+2. Create a private event draft in `/lord/ticketing` and enter only organizer-confirmed event and venue information.
 3. Add ticket tiers and release waves with confirmed KES pricing, inventory, benefits and opening rules. Assign gate staff and a named gate from the scanner workspace.
 4. Complete the sandbox acceptance checklist above using Paystack test credentials. Confirm the buyer receives the one-time wallet email, sees the issued ticket, and the assigned scanner accepts the first scan but rejects a duplicate.
 5. Only after the owner approves the production release, set the release switches, open the approved event and verify sales and scans in Live Operations. Orders and earnings remain in the isolated Ticketing ledger.
