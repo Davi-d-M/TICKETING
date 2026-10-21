@@ -130,12 +130,16 @@ select {
   color: var(--ticket-text) !important;
 }
 
-.ticket-theme-scope :is([class~="text-slate-500"], [class~="text-slate-600"]) {
+.ticket-theme-scope :is([class~="text-slate-500"], [class~="text-slate-600"], [class*="text-slate-200/"], [class*="text-slate-400/"]) {
   color: var(--ticket-copy) !important;
 }
 
-.ticket-theme-scope :is([class~="text-orange-100"], [class~="text-orange-200"], [class~="text-orange-300"], [class~="text-orange-400"], [class~="text-amber-100"], [class~="text-amber-200"], [class~="text-amber-300"], [class~="text-violet-200"]) {
+.ticket-theme-scope :is([class*="text-orange-"], [class*="text-amber-"], [class*="text-violet-"]) {
   color: var(--ticket-accent) !important;
+}
+
+.ticket-theme-scope :is([class*="bg-orange-500/"], [class*="bg-violet-"]) {
+  background-color: var(--ticket-accent-soft) !important;
 }
 
 .ticket-theme-scope :is([class*="border-white/"], [class*="border-orange-"], [class*="border-amber-"]) {
