@@ -105,6 +105,53 @@ select {
   color: var(--ticket-text);
 }
 
+.ticket-theme-page {
+  background: var(--ticket-page);
+  color: var(--ticket-text);
+  color-scheme: inherit;
+}
+
+.ticket-theme-panel,
+.ticket-theme-panel-muted {
+  border-color: var(--ticket-border);
+  color: var(--ticket-text);
+}
+
+.ticket-theme-panel {
+  background: var(--ticket-panel);
+}
+
+.ticket-theme-panel-muted {
+  background: var(--ticket-panel-muted);
+}
+
+.ticket-theme-hero {
+  background: var(--ticket-hero);
+  border-color: var(--ticket-border);
+}
+
+.ticket-theme-text {
+  color: var(--ticket-text);
+}
+
+.ticket-theme-copy {
+  color: var(--ticket-copy);
+}
+
+.ticket-theme-muted {
+  color: var(--ticket-muted);
+}
+
+.ticket-theme-accent {
+  color: var(--ticket-accent);
+}
+
+.ticket-theme-accent-soft {
+  border-color: var(--ticket-border);
+  background: var(--ticket-accent-soft);
+  color: var(--ticket-accent);
+}
+
 .ticket-theme-scope :is([class~="bg-[#0d0a12]"], [class~="bg-[#0b0a0f]"]) {
   background-color: var(--ticket-page) !important;
 }

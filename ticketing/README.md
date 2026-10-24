@@ -7,6 +7,7 @@ The customer event pages, guest ticket wallets and wallet-access emails use the 
 ## Implemented flows
 
 - Owner/admin event and tier management, including venue arrival guidance, fixed per-ticket fees, ticket benefits, capacity, sale windows and promotion codes. The platform owner can adjust the service fee while sales are open; future checkouts use the new fee while existing order totals stay unchanged. Tier terms lock once an order exists, and venue changes lock after sales open. Only the platform owner can open ticket sales. Opening sales requires future event dates, an active paid tier, a verified map destination and explicit server-side release approvals.
+- Public event discovery supports typo-tolerant search, city/date/maximum-price filters, price and date sorting, opt-in nearby sorting, and a map view for events with published venue coordinates. Browser location is requested only after the guest selects **Near me** and is not persisted.
 - Paystack KES checkout with a 15-minute inventory reservation, idempotent order/payment records, signed webhook validation, independent server-side payment verification, and exact amount/currency/buyer-email matching.
 - Tickets are issued only after verified payment. Credentials are hashed for validation; guest wallets receive signed ticket-specific QR tokens that rotate every five minutes.
 - Buyers retrieve their wallet through an emailed, single-use, 30-minute access link and an HttpOnly, 30-day session cookie. A rate-limited resend form is available if delivery fails.
