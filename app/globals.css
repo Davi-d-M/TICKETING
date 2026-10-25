@@ -44,6 +44,15 @@ select {
   --ticket-accent-strong: #fb923c;
   --ticket-accent-soft: rgb(251 146 60 / 12%);
   --ticket-action-text: #170d18;
+  --ticket-wave-crimson-bg: linear-gradient(135deg, #241018, #1c1017 58%, #15101d);
+  --ticket-wave-violet-bg: linear-gradient(135deg, #17152d, #15121d 58%, #15101d);
+  --ticket-wave-amber-bg: linear-gradient(135deg, #251e13, #1d1712 58%, #15101d);
+  --ticket-wave-crimson-accent: #ffe4e6;
+  --ticket-wave-violet-accent: #ede9fe;
+  --ticket-wave-amber-accent: #fef3c7;
+  --ticket-wave-crimson-soft: rgb(244 63 94 / 10%);
+  --ticket-wave-violet-soft: rgb(167 139 250 / 10%);
+  --ticket-wave-amber-soft: rgb(251 191 36 / 10%);
   min-height: 100vh;
   background: var(--ticket-page);
   color: var(--ticket-text);
@@ -64,6 +73,15 @@ select {
   --ticket-accent-strong: #ea580c;
   --ticket-accent-soft: #fff7ed;
   --ticket-action-text: #ffffff;
+  --ticket-wave-crimson-bg: linear-gradient(135deg, #fff1f2, #ffffff 58%, #fff7f7);
+  --ticket-wave-violet-bg: linear-gradient(135deg, #f5f3ff, #ffffff 58%, #eff6ff);
+  --ticket-wave-amber-bg: linear-gradient(135deg, #fffbeb, #ffffff 58%, #fefce8);
+  --ticket-wave-crimson-accent: #be123c;
+  --ticket-wave-violet-accent: #6d28d9;
+  --ticket-wave-amber-accent: #a16207;
+  --ticket-wave-crimson-soft: #fff1f2;
+  --ticket-wave-violet-soft: #f5f3ff;
+  --ticket-wave-amber-soft: #fffbeb;
   color-scheme: light;
 }
 
@@ -80,6 +98,15 @@ select {
   --ticket-accent-strong: #5b21b6;
   --ticket-accent-soft: #f5f3ff;
   --ticket-action-text: #ffffff;
+  --ticket-wave-crimson-bg: linear-gradient(135deg, #fff1f2, #ffffff 58%, #fff7f7);
+  --ticket-wave-violet-bg: linear-gradient(135deg, #f5f3ff, #ffffff 58%, #eff6ff);
+  --ticket-wave-amber-bg: linear-gradient(135deg, #fffbeb, #ffffff 58%, #fefce8);
+  --ticket-wave-crimson-accent: #be123c;
+  --ticket-wave-violet-accent: #6d28d9;
+  --ticket-wave-amber-accent: #a16207;
+  --ticket-wave-crimson-soft: #fff1f2;
+  --ticket-wave-violet-soft: #f5f3ff;
+  --ticket-wave-amber-soft: #fffbeb;
   color-scheme: light;
 }
 
@@ -96,6 +123,15 @@ select {
   --ticket-accent-strong: #065f46;
   --ticket-accent-soft: #ecfdf5;
   --ticket-action-text: #ffffff;
+  --ticket-wave-crimson-bg: linear-gradient(135deg, #fff1f2, #ffffff 58%, #fff7f7);
+  --ticket-wave-violet-bg: linear-gradient(135deg, #f5f3ff, #ffffff 58%, #eff6ff);
+  --ticket-wave-amber-bg: linear-gradient(135deg, #fffbeb, #ffffff 58%, #fefce8);
+  --ticket-wave-crimson-accent: #be123c;
+  --ticket-wave-violet-accent: #6d28d9;
+  --ticket-wave-amber-accent: #a16207;
+  --ticket-wave-crimson-soft: #fff1f2;
+  --ticket-wave-violet-soft: #f5f3ff;
+  --ticket-wave-amber-soft: #fffbeb;
   color-scheme: light;
 }
 
@@ -191,6 +227,48 @@ select {
 
 .ticket-theme-scope :is([class*="border-white/"], [class*="border-orange-"], [class*="border-amber-"]) {
   border-color: var(--ticket-border) !important;
+}
+
+.ticket-theme-scope .ticket-wave-card[data-wave-theme="crimson-black"] {
+  background: var(--ticket-wave-crimson-bg) !important;
+}
+
+.ticket-theme-scope .ticket-wave-card[data-wave-theme="electric-violet"] {
+  background: var(--ticket-wave-violet-bg) !important;
+}
+
+.ticket-theme-scope .ticket-wave-card[data-wave-theme="obsidian-gold"] {
+  background: var(--ticket-wave-amber-bg) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="crimson-black"],
+.ticket-theme-scope .ticket-wave-price[data-wave-theme="crimson-black"] {
+  color: var(--ticket-wave-crimson-accent) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="electric-violet"],
+.ticket-theme-scope .ticket-wave-price[data-wave-theme="electric-violet"] {
+  color: var(--ticket-wave-violet-accent) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="obsidian-gold"],
+.ticket-theme-scope .ticket-wave-price[data-wave-theme="obsidian-gold"] {
+  color: var(--ticket-wave-amber-accent) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="crimson-black"] {
+  background: var(--ticket-wave-crimson-soft) !important;
+  border-color: var(--ticket-wave-crimson-accent) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="electric-violet"] {
+  background: var(--ticket-wave-violet-soft) !important;
+  border-color: var(--ticket-wave-violet-accent) !important;
+}
+
+.ticket-theme-scope .ticket-wave-accent[data-wave-theme="obsidian-gold"] {
+  background: var(--ticket-wave-amber-soft) !important;
+  border-color: var(--ticket-wave-amber-accent) !important;
 }
 
 .ticket-theme-scope .ticket-wallet-qr {
