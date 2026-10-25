@@ -23,7 +23,8 @@ Use Online Bar Admin → Ticketing at `/lord/ticketing` for event and tier confi
 
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (public URL, not a secret).
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key; server-side only.
-- `TICKETING_ADMIN_EMAIL`, `TICKETING_ADMIN_PASSWORD`, `TICKETING_ADMIN_ROLE`, `TICKETING_SESSION_SECRET` and `TICKETING_MFA_ENCRYPTION_KEY` — Ticketing's admin authentication and checkout readiness settings. Keep them server-side and follow the MFA enrollment guidance in [ticketing/README.md](./ticketing/README.md).
+- `TICKETING_ADMIN_EMAIL` — email used to identify the active Ticketing owner MFA record in the shared database. It must match the Online Bar owner account used to enroll Ticketing MFA.
+- `TICKETING_ADMIN_PASSWORD`, `TICKETING_ADMIN_ROLE`, `TICKETING_SESSION_SECRET` and `TICKETING_MFA_ENCRYPTION_KEY` are legacy standalone-admin settings; they are not checkout readiness requirements now that admin is centralized in Online Bar.
 
 ## Database setup
 
@@ -66,4 +67,4 @@ The site shell and browse-only pages work without environment variables; databas
 
 ## Sales stay disabled until release approval
 
-Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance, authenticator-protected admin sessions, five-minute rotating QR credentials, configurable Wave I/II/III releases and online assigned gate-staff scanning are implemented. Wave releases support admission-specific pricing, allocations, activation rules, and ticket appearance. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all ten migrations, configure payment/email/session/encryption/signing secrets, enroll the admin authenticator, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission and native Android wallet support are not implemented.
+Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance, Online Bar-managed Ticketing MFA, five-minute rotating QR credentials, configurable Wave I/II/III releases and online assigned gate-staff scanning are implemented. Wave releases support admission-specific pricing, allocations, activation rules, and ticket appearance. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all ten migrations, configure Paystack, email, guest-session, gate-session, encryption and signing secrets, enroll the admin authenticator in Online Bar, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission and native Android wallet support are not implemented.

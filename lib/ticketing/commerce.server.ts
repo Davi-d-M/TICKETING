@@ -91,8 +91,6 @@ export async function isTicketingSalesReady() {
   const configurationReady = process.env.TICKETING_SALES_ENABLED === 'true'
     && process.env.TICKETING_RELEASE_APPROVED === 'true'
     && Boolean(process.env.TICKETING_ADMIN_EMAIL?.trim())
-    && Boolean(process.env.TICKETING_ADMIN_PASSWORD)
-    && Boolean((process.env.TICKETING_SESSION_SECRET?.trim().length || 0) >= 32)
     && Boolean(expectedKeyPrefix && secret.startsWith(expectedKeyPrefix))
     && Boolean(process.env.RESEND_API_KEY?.trim())
     && Boolean(emailFrom && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFrom))
@@ -101,7 +99,6 @@ export async function isTicketingSalesReady() {
     && Boolean((process.env.TICKETING_GATE_SESSION_SECRET?.trim().length || 0) >= 32)
     && Boolean((process.env.TICKETING_TICKET_ENCRYPTION_KEY?.trim().length || 0) >= 32)
     && Boolean((process.env.TICKETING_QR_SIGNING_SECRET?.trim().length || 0) >= 32)
-    && Boolean((process.env.TICKETING_MFA_ENCRYPTION_KEY?.trim().length || 0) >= 32)
     && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim())
     && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
   if (!configurationReady) return false;
