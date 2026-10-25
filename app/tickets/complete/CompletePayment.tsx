@@ -64,7 +64,7 @@ export default function CompletePayment({ reference }: { reference: string }) {
         <p className="mt-3 text-sm leading-6 text-slate-300">
           {loading ? 'We’re checking the transaction directly with Paystack. Please keep this page open.' :
             result?.success ? result.emailSent === false
-              ? `Payment is verified. We could not send the wallet email to ${result.email}; request another link below.`
+              ? `Payment and order ${result.orderReference} are recorded. The wallet email could not be sent to ${result.email}; retry below after email delivery is available.`
               : `We sent a one-time ticket-wallet link to ${result.email}.` :
               result?.error || 'Please try verification again shortly.'}
         </p>

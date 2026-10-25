@@ -68,18 +68,17 @@ The platform must keep its service-role key server-side. API access to admin fun
 
 Configure the following server-side variables from `.env.example` in deployment. Use a Paystack test secret while validating the sandbox:
 
-- `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true` — both must be deliberately enabled after acceptance checks; default is `false`.
 - `TICKETING_PAYMENT_MODE=test` and `PAYSTACK_SECRET_KEY=sk_test_...`.
-- `TICKETING_PUBLIC_URL=https://...` using the final HTTPS site URL.
-- `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL`.
-- `TICKETING_GUEST_SESSION_SECRET` and `TICKETING_TICKET_ENCRYPTION_KEY`, each a unique random secret of at least 32 characters. Back up the encryption secret securely; rotating it without re-encrypting ticket credentials will make existing wallet QR codes unreadable.
-- `TICKETING_GATE_SESSION_SECRET` — a unique random secret of at least 32 characters for gate staff sessions; keep it separate from other session secrets.
-- `TICKETING_QR_SIGNING_SECRET` — an independent random value of at least 32 characters for signed five-minute ticket QR credentials. Keep it separate from all session and encryption keys.
+- `TICKETING_PUBLIC_URL=https://...` using the final HTTPS site URL, and `TICKETING_TICKET_ENCRYPTION_KEY`, a unique random secret of at least 32 characters. Back up the encryption secret securely; rotating it without re-encrypting ticket credentials will make existing wallet QR codes unreadable.
 - Existing Supabase URL and server-side service-role key.
 
-Configure administrator credentials, session and MFA encryption secrets on the Ticketing Vercel project; keep them server-side and separate from other application credentials. Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`. The public return page is `/tickets/complete`. The dashboard checks that the commerce schema is available before indicating sales are ready, and the checkout endpoint independently enforces the same checks.
+Open and pause event sales from Online Bar Admin → Ticketing. This owner-controlled event status is the sales switch; separate Vercel sales-enable flags are not required. Checkout readiness requires a matching Paystack mode/key, the shared Ticketing database and checkout migrations, the secure public URL, encrypted ticket issuance, and the enrolled owner MFA record. Provider keys and encryption secrets remain server-only.
 
-Before opening a real event, enroll the admin authenticator and exercise sandbox purchases, duplicate and delayed callbacks, amount/currency/email mismatches, expired reservations, guest-link single use and expiry, email-delivery failure/retry, public verification privacy, expired/replayed rotating QR codes, simultaneous scans and request replay after a timeout, wrong-event/unassigned-staff scans, rate limits, revoked/refunded credentials, transfer approval/rejection, replacement-ticket access, and cancelled/out-of-window event admission. Keep both release switches off until all tests pass. Sandbox testing and production release approval are separate; never enable live Paystack keys without a separate production acceptance review.
+Configure `RESEND_API_KEY`, a verified `RESEND_FROM_EMAIL`, `TICKETING_GUEST_SESSION_SECRET`, and `TICKETING_QR_SIGNING_SECRET` to enable customer wallet-email delivery. These are separate from checkout readiness: a Paystack payment is verified, the paid order and ticket are recorded, and the Online Bar sales ledger is updated even if the wallet email cannot be sent. The customer page reports when email delivery is not ready; keep the order reference for access support.
+
+Configure `TICKETING_GATE_SESSION_SECRET` for online gate-staff sessions. Configure administrator session and MFA encryption secrets on the Ticketing Vercel project; keep them server-side and separate from other application credentials. Set the Paystack webhook to `https://<site-host>/api/ticketing/paystack/webhook`. The public return page is `/tickets/complete`. The dashboard checks payment/ticket schema and matching credentials before indicating checkout is ready.
+
+Before opening a real event, enroll the admin authenticator and exercise sandbox purchases, duplicate and delayed callbacks, amount/currency/email mismatches, expired reservations, guest-link single use and expiry, email-delivery failure/retry, public verification privacy, expired/replayed rotating QR codes, simultaneous scans and request replay after a timeout, wrong-event/unassigned-staff scans, rate limits, revoked/refunded credentials, transfer approval/rejection, replacement-ticket access, and cancelled/out-of-window event admission. Sandbox testing and production release approval are separate; never enable live Paystack keys without a separate production acceptance review.
 
 ### First event and operating sequence
 
@@ -87,7 +86,7 @@ Before opening a real event, enroll the admin authenticator and exercise sandbox
 2. Create a private event draft in `/lord/ticketing` and enter only organizer-confirmed event and venue information.
 3. Add ticket tiers and release waves with confirmed KES pricing, inventory, benefits and opening rules. Assign gate staff and a named gate from the scanner workspace.
 4. Complete the sandbox acceptance checklist above using Paystack test credentials. Confirm the buyer receives the one-time wallet email, sees the issued ticket, and the assigned scanner accepts the first scan but rejects a duplicate.
-5. Only after the owner approves the production release, set the release switches, open the approved event and verify sales and scans in Live Operations. Orders and earnings remain in the isolated Ticketing ledger.
+5. Only after the owner approves the production release, set the Paystack mode/key to live, open the approved event in Online Bar Admin, and verify sales and scans in Live Operations. Orders and earnings remain in the isolated Ticketing ledger.
 
 The public site intentionally shows no event until an approved event has a ticket wave open for sale. A scheduled ticket-wave opening controls ticket sales; it is not the separate Midnight Society member-pass countdown.
 

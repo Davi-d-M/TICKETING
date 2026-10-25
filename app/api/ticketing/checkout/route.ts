@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Same-origin checkout requests are required.' }, { status: 403 });
   }
   if (!await isTicketingSalesReady()) {
-    return NextResponse.json({ error: 'Ticket sales are not enabled. Checkout and guest email delivery must be configured first.' }, { status: 503 });
+    return NextResponse.json({ error: 'Ticket checkout is not ready. Ask the platform owner to check payment and ticket security readiness in Online Bar Admin.' }, { status: 503 });
   }
 
   let body: Record<string, unknown>;

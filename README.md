@@ -39,9 +39,10 @@ After reviewing the SQL and confirming the target Supabase project, apply in thi
 7. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 8. `supabase/TICKETING_MFA_MIGRATION.sql`
 9. `supabase/TICKETING_WAVES_MIGRATION.sql`
-10. `supabase/TICKETING_DEMAND_INTELLIGENCE_MIGRATION.sql`
+10. `supabase/TICKETING_SAFE_LIVE_TICKET_EDIT_MIGRATION.sql`
+11. `supabase/TICKETING_DEMAND_INTELLIGENCE_MIGRATION.sql`
 
-The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
+The safe live-ticket edit migration enables Online Bar admins to edit existing standard tiers and release waves while an event is on sale. It preserves purchase-time order snapshots, protects issued and reserved capacity, and makes checkout reject totals that changed before order creation. Apply it to the shared Supabase project before opening sales or using live ticket edits. The public pages list only future events belonging to approved organizers and marked `on_sale`; they expose a limited set of event and active-tier fields. Event creation is admin-only.
 Admins can upload or replace JPEG, PNG and WebP event photos (up to 4 MB) from the event form or event card. The bucket is public-read-only; uploads require the admin session and server-side Supabase service role. Apply the event-images migration before uploading.
 
 The premium-experience migration adds venue maps and arrival guidance, per-ticket fees, configurable tier benefits, and server-validated promotion codes. It also adds transactional admin updates for event capacity and ticket tiers, plus an audited service-fee control. The platform owner can adjust the fixed fee while sales are open; the new fee applies to future checkouts and does not rewrite existing order totals. Sales cannot open until a Google Maps link, coordinates, or a complete venue address and city have been supplied. Only publish confirmed transport, parking and entrance information.
@@ -65,6 +66,6 @@ npm run dev
 
 The site shell and browse-only pages work without environment variables; database-backed listings show a setup message until Supabase is configured.
 
-## Sales stay disabled until release approval
+## Sales are controlled from Online Bar Admin
 
-Paystack sandbox checkout, server-side payment verification, guest-email wallet access, ticket issuance, Online Bar-managed Ticketing MFA, five-minute rotating QR credentials, configurable Wave I/II/III releases and online assigned gate-staff scanning are implemented. Wave releases support admission-specific pricing, allocations, activation rules, and ticket appearance. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. Live purchases remain disabled by default: apply and test all ten migrations, configure Paystack, email, guest-session, gate-session, encryption and signing secrets, enroll the admin authenticator in Online Bar, and pass end-to-end acceptance before setting both `TICKETING_SALES_ENABLED=true` and `TICKETING_RELEASE_APPROVED=true`. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission and native Android wallet support are not implemented.
+Paystack checkout, server-side payment verification, ticket issuance, Online Bar-managed Ticketing MFA, five-minute rotating QR credentials, configurable Wave I/II/III releases and online assigned gate-staff scanning are implemented. Wave releases support admission-specific pricing, allocations, activation rules, and ticket appearance. Transfers require owner approval; approval invalidates the previous credential and issues a replacement ticket to the recipient. The owner controls whether an event is on sale in Online Bar Admin. Verified payments and paid orders are recorded in the Online Bar Ticket sales ledger even if wallet-email delivery is unavailable; configure Resend and guest-wallet secrets separately to deliver customer access automatically. Configure Paystack, the shared database, ticket-encryption key and owner MFA before opening sales. See [ticketing/README.md](./ticketing/README.md) for full setup and limitations. Offline admission and native Android wallet support are not implemented.

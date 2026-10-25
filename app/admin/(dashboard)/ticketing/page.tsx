@@ -915,7 +915,7 @@ export default function TicketingPage() {
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-16 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
           <div className="relative flex items-start gap-3">
             <span className="rounded-xl border border-orange-300/20 bg-orange-300/10 p-2 text-orange-300"><AlertTriangle size={18} /></span>
-            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">{data?.salesReady ? 'Checkout configuration passes its release checks' : 'Sales are locked for now'}</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">{data?.salesReady ? 'Sandbox rehearsal still required' : 'Configuration required'}</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">The implemented order flow reserves inventory, initializes Paystack, verifies payment server-side, issues encrypted tickets and emails one-time wallet access. Gate staff scan online with event-and-gate-scoped accounts. Keep both release switches off until all nine migrations, sandbox credentials, email delivery, admin MFA and the full payment-to-wallet-to-gate rehearsal are verified. See the Trust Centre for live schema and configuration checks.</p><Link href="/admin/ticketing/security" className="mt-2 inline-flex text-xs font-black text-orange-100 underline underline-offset-2">Open Trust Centre readiness checks</Link></div>
+            <div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-orange-100">{data?.salesReady ? 'Payment and ticket security checks pass' : 'Payment setup is not ready'}</p><span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">{data?.salesReady ? 'Check sandbox before live sales' : 'Configuration required'}</span></div><p className="mt-1 text-xs leading-5 text-orange-50/70">Paystack payments are verified server-side and paid orders are recorded in the Online Bar Ticket sales ledger. Wallet email delivery is separate: a missing or failed email does not undo a verified payment. The owner opens or pauses each event from Online Bar Admin after the payment, encrypted-ticket, database and MFA checks pass. See the Trust Centre for readiness checks.</p><Link href="/admin/ticketing/security" className="mt-2 inline-flex text-xs font-black text-orange-100 underline underline-offset-2">Open Trust Centre readiness checks</Link></div>
           </div>
         </section>
 
@@ -936,7 +936,7 @@ export default function TicketingPage() {
           </div>
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-white/5 bg-black/20 p-3 text-[11px] leading-5 text-slate-400">
             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-violet-300" />
-            <p>QR screenshots and payment messages are not proof of a valid ticket. Keep the release gate off until sandbox callbacks, guest email delivery, scanner behavior and database migrations have been exercised end-to-end.</p>
+            <p>QR screenshots and payment messages are not proof of a valid ticket. Run sandbox callbacks, ticket issuance, wallet delivery and scanner checks before opening live sales in Online Bar Admin.</p>
           </div>
         </section>
 

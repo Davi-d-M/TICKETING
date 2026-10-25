@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock3, Ghost, MapPin, Navigation, ShieldAlert, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
-import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import { isTicketingGuestAccessReady, isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 import PurchaseForm from '../PurchaseForm';
 import TicketDemandBeacon from '../TicketDemandBeacon';
@@ -72,7 +72,10 @@ export default async function TicketEventPage({ params }: PageProps) {
   if (!event) notFound();
 
   const now = Date.now();
-  const salesReady = await isTicketingSalesReady();
+  const [salesReady, guestAccessReady] = await Promise.all([
+    isTicketingSalesReady(),
+    isTicketingGuestAccessReady()
+  ]);
   const mapLinks = getVenueMapLinks(event);
   return (
     <>
@@ -177,7 +180,7 @@ export default async function TicketEventPage({ params }: PageProps) {
                       />
                     ) : (
                       <p role="status" className="ticket-checkout-paused mt-3 rounded-xl border p-3 text-xs leading-5">
-                        Checkout is paused while Paystack, secure ticket email and server secrets are being configured.
+                        Checkout is paused while the platform owner completes payment and ticket-security setup in Online Bar Admin.
                       </p>
                     )}
                   </article>
@@ -188,7 +191,11 @@ export default async function TicketEventPage({ params }: PageProps) {
 
           <aside className="space-y-4">
             <section role="status" className="rounded-3xl border border-orange-300/20 bg-gradient-to-br from-orange-950/35 to-[#1b1221] p-5 sm:p-6">
-              <div className="flex items-start gap-3"><span className="rounded-xl bg-orange-300/10 p-2 text-orange-200"><ShieldAlert size={18} /></span><div><h2 className="text-sm font-black text-orange-100">{salesReady ? 'Secure Paystack checkout' : 'Purchases are not open'}</h2><p className="mt-2 text-xs leading-5 text-orange-50/70">{salesReady ? 'Payment is verified with Paystack on the server before tickets are issued. A one-time wallet link is sent to your purchase email.' : 'Ticket listings are visible, but checkout stays paused until Paystack, guest email delivery and the server-side security settings are configured.'}</p></div></div>
+              <div className="flex items-start gap-3"><span className="rounded-xl bg-orange-300/10 p-2 text-orange-200"><ShieldAlert size={18} /></span><div><h2 className="text-sm font-black text-orange-100">{salesReady ? 'Secure Paystack checkout' : 'Purchases are not open'}</h2><p className="mt-2 text-xs leading-5 text-orange-50/70">{salesReady
+                ? guestAccessReady
+                  ? 'Payment is verified with Paystack on the server before tickets are issued. A one-time wallet link is sent to your purchase email.'
+                  : 'Verified payments and ticket orders are recorded in Online Bar Admin. Wallet-email delivery is not configured yet, so keep your order reference for ticket access.'
+                : 'Ticket listings are visible, but checkout is paused until the payment, ticket-security and database checks pass and the event is opened for sale in Online Bar Admin.'}</p></div></div>
             </section>
             <section id="arrival-guide" className="scroll-mt-5 rounded-3xl border border-white/10 bg-[#17121e] p-5 sm:p-6">
               <h2 className="text-sm font-black text-white">Venue & arrival guide</h2>

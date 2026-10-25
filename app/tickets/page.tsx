@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Ghost, ShieldCheck, Ticket } from 'lucide-react';
 import { getPublicTicketEvents } from '@/lib/ticketing/publicEvents.server';
-import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import { isTicketingGuestAccessReady, isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 import TicketingBrand from './TicketingBrand';
 import TicketEventDiscovery from './TicketEventDiscovery';
 
@@ -14,9 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TicketDiscoveryPage() {
-  const [result, salesReady] = await Promise.all([
+  const [result, salesReady, guestAccessReady] = await Promise.all([
     getPublicTicketEvents(),
-    isTicketingSalesReady()
+    isTicketingSalesReady(),
+    isTicketingGuestAccessReady()
   ]);
 
   return (
@@ -49,9 +50,11 @@ export default async function TicketDiscoveryPage() {
               <p className="ticket-theme-copy mt-1 text-xs leading-5">
                 {salesReady
                   ? result.ok && result.events.length
-                    ? 'Only events officially opened for sale are listed. Paystack payments are checked server-side before tickets are issued.'
-                    : 'Checkout configuration checks pass, but there are no approved events open for sale right now. Payment is verified with Paystack before any ticket is issued.'
-                  : 'Events are listed only when approved and on sale. Purchases stay disabled until payment, secure ticket delivery and server checks are configured.'}
+                    ? guestAccessReady
+                      ? 'Only events opened for sale in Online Bar Admin are listed. Paystack payments are checked server-side before tickets are issued.'
+                      : 'Payments are verified by Paystack and recorded in Online Bar Admin. Wallet-email delivery is not configured yet; keep your order reference for ticket access.'
+                    : 'Payment checks pass, but no approved events are open for sale in Online Bar Admin right now.'
+                  : 'Events are listed only when approved and opened for sale in Online Bar Admin. Checkout requires valid payment configuration, ticket security and database checks.'}
               </p>
             </div>
           </section>

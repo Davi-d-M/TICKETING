@@ -40,6 +40,17 @@ function paystackSecret() {
   return process.env.PAYSTACK_SECRET_KEY?.trim() || '';
 }
 
+function hasSecureTicketingPublicUrl() {
+  const publicUrl = process.env.TICKETING_PUBLIC_URL?.trim();
+  if (!publicUrl) return false;
+  try {
+    const url = new URL(publicUrl);
+    return url.protocol === 'https:' || (process.env.NODE_ENV !== 'production' && url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+}
+
 function ticketSecret() {
   const secret = process.env.TICKETING_TICKET_ENCRYPTION_KEY?.trim();
   if (!secret || secret.length < 32) throw new Error('Ticket credential encryption is not configured.');
@@ -76,41 +87,20 @@ export async function isTicketingSalesReady() {
   const secret = paystackSecret();
   const mode = process.env.TICKETING_PAYMENT_MODE?.trim();
   const expectedKeyPrefix = mode === 'test' ? 'sk_test_' : mode === 'live' ? 'sk_live_' : '';
-  const publicUrl = process.env.TICKETING_PUBLIC_URL?.trim();
-  const emailFrom = process.env.RESEND_FROM_EMAIL?.trim();
-  const validPublicUrl = (() => {
-    if (!publicUrl) return false;
-    try {
-      const url = new URL(publicUrl);
-      return url.protocol === 'https:' || (process.env.NODE_ENV !== 'production' && url.hostname === 'localhost');
-    } catch {
-      return false;
-    }
-  })();
 
-  const configurationReady = process.env.TICKETING_SALES_ENABLED === 'true'
-    && process.env.TICKETING_RELEASE_APPROVED === 'true'
-    && Boolean(process.env.TICKETING_ADMIN_EMAIL?.trim())
-    && Boolean(expectedKeyPrefix && secret.startsWith(expectedKeyPrefix))
-    && Boolean(process.env.RESEND_API_KEY?.trim())
-    && Boolean(emailFrom && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFrom))
-    && validPublicUrl
-    && Boolean((process.env.TICKETING_GUEST_SESSION_SECRET?.trim().length || 0) >= 32)
-    && Boolean((process.env.TICKETING_GATE_SESSION_SECRET?.trim().length || 0) >= 32)
+  const configurationReady = Boolean(expectedKeyPrefix && secret.startsWith(expectedKeyPrefix))
+    && hasSecureTicketingPublicUrl()
     && Boolean((process.env.TICKETING_TICKET_ENCRYPTION_KEY?.trim().length || 0) >= 32)
-    && Boolean((process.env.TICKETING_QR_SIGNING_SECRET?.trim().length || 0) >= 32)
     && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim())
     && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
   if (!configurationReady) return false;
 
   const database = createServerSupabaseClient();
   if (!database) return false;
-  const migrationChecks = await Promise.all([
+  const [migrationChecks, checkoutFunctionCheck] = await Promise.all([
+    Promise.all([
     database.from('ticketing_payment_attempts').select('checkout_url').limit(0),
     database.from('ticketing_tickets').select('credential_ciphertext').limit(0),
-    database.from('ticketing_guest_access_links').select('id').limit(0),
-    database.from('ticketing_gate_staff_assignments').select('event_id').limit(0),
-    database.from('ticketing_rate_limit_windows').select('bucket_hash').limit(0),
     database.from('ticketing_ticket_types').select('wave_number,admission_type,activation_mode,wave_manual_open').limit(0),
     database.from('ticketing_events').select('venue_maps_url,service_fee_minor').limit(0),
     database.from('ticketing_orders').select('promotion_id').limit(0),
@@ -118,16 +108,57 @@ export async function isTicketingSalesReady() {
       .select('active')
       .eq('email', process.env.TICKETING_ADMIN_EMAIL?.trim().toLowerCase() || '')
       .maybeSingle()
+    ]),
+    // The invalid input is rejected before the RPC reserves inventory; this checks its exact deployed signature.
+    database.rpc('ticketing_start_checkout', {
+      p_event_id: null,
+      p_ticket_type_id: null,
+      p_quantity: null,
+      p_buyer_email: null,
+      p_buyer_name: null,
+      p_idempotency_key: null,
+      p_paystack_reference: null,
+      p_promotion_code: null,
+      p_expected_total_minor: null
+    })
   ]);
   const migrationError = migrationChecks.find(check => check.error)?.error;
   if (migrationError) {
     console.error('[TicketingCommerce] Commerce migration readiness check failed:', migrationError);
     return false;
   }
+  if (checkoutFunctionCheck.error?.code !== '22023') {
+    console.error('[TicketingCommerce] The current ticket checkout migration is not available:', checkoutFunctionCheck.error);
+    return false;
+  }
   const mfaReadiness = migrationChecks[migrationChecks.length - 1] as {
     data: { active?: boolean } | null;
   };
   if (mfaReadiness.data?.active !== true) return false;
+  return true;
+}
+
+export async function isTicketingGuestAccessReady() {
+  const emailFrom = process.env.RESEND_FROM_EMAIL?.trim() || '';
+  const configurationReady = Boolean(process.env.RESEND_API_KEY?.trim())
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFrom)
+    && hasSecureTicketingPublicUrl()
+    && Boolean((process.env.TICKETING_GUEST_SESSION_SECRET?.trim().length || 0) >= 32)
+    && Boolean((process.env.TICKETING_QR_SIGNING_SECRET?.trim().length || 0) >= 32)
+    && Boolean((process.env.TICKETING_TICKET_ENCRYPTION_KEY?.trim().length || 0) >= 32);
+  if (!configurationReady) return false;
+
+  const database = createServerSupabaseClient();
+  if (!database) return false;
+  const [guestLinks, rateLimits] = await Promise.all([
+    database.from('ticketing_guest_access_links').select('id').limit(0),
+    database.from('ticketing_rate_limit_windows').select('bucket_hash').limit(0)
+  ]);
+  const error = guestLinks.error || rateLimits.error;
+  if (error) {
+    console.error('[TicketingCommerce] Guest access readiness check failed:', error);
+    return false;
+  }
   return true;
 }
 

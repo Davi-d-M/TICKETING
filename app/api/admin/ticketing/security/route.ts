@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession, isSameOriginRequest } from '@/lib/adminAccess.server';
 import { createServerSupabaseClient } from '@/lib/serverSupabase';
-import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
+import { isTicketingGuestAccessReady, isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,6 +135,7 @@ export async function GET() {
     && hasSecret(process.env.TICKETING_GUEST_SESSION_SECRET);
   const scannerConfigured = !scannerAccountsSchema.error && !scannerAssignmentsSchema.error && !rateLimitSchema.error
     && hasSecret(process.env.TICKETING_GATE_SESSION_SECRET);
+  const guestAccessReady = await isTicketingGuestAccessReady();
   const controls = [
     {
       id: 'mfa',
@@ -151,6 +152,12 @@ export async function GET() {
       state: walletConfigured ? 'Configured · scoped' : 'Configuration required',
       ready: walletConfigured,
       description: 'Guest wallet links are scoped to the paid order or transferred ticket, protected by an HttpOnly session, and loaded from isolated Ticketing records.'
+    },
+    {
+      id: 'guest-delivery',
+      state: guestAccessReady ? 'Configured' : 'Delivery setup required',
+      ready: guestAccessReady,
+      description: 'Wallet email delivery is separate from checkout. Verified payments and paid orders are recorded even when email delivery is unavailable.'
     },
     {
       id: 'paystack',
@@ -187,8 +194,8 @@ export async function GET() {
       state: salesReady ? 'Release checks passed' : 'Sales release blocked',
       ready: salesReady,
       description: salesReady
-        ? 'Required sales secrets, release approvals, and commerce schema checks are passing.'
-        : `Sales release requires configured payment/email/session secrets, required migrations, TICKETING_SALES_ENABLED=true, and TICKETING_RELEASE_APPROVED=true. Current switches: sales ${process.env.TICKETING_SALES_ENABLED === 'true' ? 'on' : 'off'}, approval ${process.env.TICKETING_RELEASE_APPROVED === 'true' ? 'on' : 'off'}.`
+        ? 'Payment, encrypted ticket issuance, owner MFA, and checkout database checks are passing. Event availability is managed in Online Bar Admin.'
+        : 'Sales release requires a matching Paystack mode/key, secure public URL, ticket-encryption key, shared database, owner MFA, and checkout migrations. Open and pause events in Online Bar Admin.'
     }
   ];
 

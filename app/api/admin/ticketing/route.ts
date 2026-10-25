@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Only the platform owner can open ticket sales.' }, { status: 403 });
     }
     if (status === 'on_sale' && !await isTicketingSalesReady()) {
-      return NextResponse.json({ error: 'Sales release is blocked. Configure the Paystack sandbox, ticket email, guest secrets, approved database migrations and release approval first.' }, { status: 503 });
+      return NextResponse.json({ error: 'Sales release is blocked. Configure Paystack, encrypted ticket issuance, the required database migrations and owner MFA first.' }, { status: 503 });
     }
     const { data, error } = await database.rpc('ticketing_set_event_status', {
       p_event_id: eventId,
