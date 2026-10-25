@@ -97,6 +97,7 @@ export default function PurchaseForm({ eventId, ticketTypeId, name, price, servi
           name: buyerName,
           email,
           promotionCode: promotionCode.trim().toUpperCase(),
+          expectedTotalMinor: Math.round(total),
           idempotencyKey: idempotencyKey.current
         })
       });

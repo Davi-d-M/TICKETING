@@ -30,11 +30,13 @@ export async function POST(request: Request) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '';
   const promotionCode = typeof body.promotionCode === 'string' ? body.promotionCode.trim().toUpperCase() : '';
+  const expectedTotalMinor = Number(body.expectedTotalMinor);
   if (!uuidPattern.test(eventId) || !uuidPattern.test(ticketTypeId)
     || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20
     || name.length < 1 || name.length > 160
     || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
     || !uuidPattern.test(idempotencyKey)
+    || !Number.isSafeInteger(expectedTotalMinor) || expectedTotalMinor < 1
     || promotionCode.length > 40 || (promotionCode && !/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(promotionCode))) {
     return NextResponse.json({ error: 'Enter a valid name, email, ticket quantity and ticket option.' }, { status: 400 });
   }
@@ -51,11 +53,18 @@ export async function POST(request: Request) {
     p_buyer_name: name,
     p_idempotency_key: idempotencyKey,
     p_paystack_reference: paymentReference,
-    p_promotion_code: promotionCode || null
+    p_promotion_code: promotionCode || null,
+    p_expected_total_minor: expectedTotalMinor
   });
   if (error || !data) {
     if (error?.code === 'P0001') {
       return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    if (error?.code === 'PGRST202' || error?.code === '42883') {
+      console.error('[TicketingCheckout] Safe live-ticket edit migration is not applied:', error);
+      return NextResponse.json({
+        error: 'Ticket checkout needs the latest database migration. Please retry after the ticketing system is updated.'
+      }, { status: 503 });
     }
     if (error?.code === 'P0002') {
       return NextResponse.json({ error: 'This ticket option is no longer available.' }, { status: 409 });

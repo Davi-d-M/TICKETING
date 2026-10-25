@@ -31,7 +31,10 @@ Review all SQL files and confirm the target Supabase project before applying the
 7. `supabase/TICKETING_VERIFICATION_MIGRATION.sql`
 8. `supabase/TICKETING_MFA_MIGRATION.sql`
 9. `supabase/TICKETING_WAVES_MIGRATION.sql`
-10. `supabase/TICKETING_DEMAND_INTELLIGENCE_MIGRATION.sql`
+10. `supabase/TICKETING_SAFE_LIVE_TICKET_EDIT_MIGRATION.sql`
+11. `supabase/TICKETING_DEMAND_INTELLIGENCE_MIGRATION.sql`
+
+The live-ticket edit migration enables Online Bar admins to edit existing standard tiers and release waves while an event is on sale. Order items retain their purchase-time ticket name and unit price; capacity cannot be reduced below issued tickets or active reservations. Price, capacity and sale-rule changes are rejected while reservations are active. Checkout rechecks its displayed total inside the order transaction, so a concurrent price or fee change cancels checkout instead of charging an unconfirmed amount. Apply this migration to the same Supabase project used by both applications before using the new admin controls.
 
 ### Online Bar payment ledger
 
