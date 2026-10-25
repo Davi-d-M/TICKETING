@@ -144,7 +144,7 @@ export default async function TicketEventPage({ params }: PageProps) {
                           className={`rounded-xl border p-2.5 ${ticketType.wave_number !== null ? 'ticket-wave-accent' : 'border-orange-300/15 bg-orange-300/10 text-orange-200'}`}
                         ><Ticket size={17} /></span>
                         <div className="min-w-0">
-                          {ticketType.wave_number !== null && <p data-wave-theme={ticketType.wave_theme} className="ticket-wave-accent mb-1 inline-flex max-w-full rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em]">{ticketType.wave_label} · {ticketType.admission_type}</p>}
+                          {ticketType.wave_number !== null && <p data-wave-theme={ticketType.wave_theme} className="ticket-wave-accent mb-1 inline-block max-w-full rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em]">{ticketType.wave_label} · {ticketType.admission_type}</p>}
                           <h3 className="font-black text-white">{ticketType.wave_number !== null ? ticketType.admission_type : ticketType.name}</h3>
                           <p className="mt-1 text-xs leading-5 text-slate-400">{ticketType.description || 'Entry for one guest. Check the event details before the night.'}</p>
                           <p className="mt-2 text-[10px] text-slate-500">Limit: {ticketType.min_per_order}–{ticketType.max_per_order} per order</p>
