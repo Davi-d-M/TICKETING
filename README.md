@@ -1,12 +1,12 @@
 # Midnight Society KE Ticketing
 
-This repository is the standalone Next.js host for Midnight Society KE Ticketing. It contains the Halloween-themed public event pages, a password-protected admin workspace, server-side Supabase integration, and ticketing-only schema migrations.
+This repository is the standalone Next.js host for Midnight Society KE Ticketing. It contains the Halloween-themed public event pages, server-side Supabase integration, and ticketing-only schema migrations. Online Bar is the Ticketing admin control panel.
 
 ## Source layout
 
 - `app/tickets/` — Halloween-themed public event discovery and event-detail/ticket-options pages.
-- `app/admin/(dashboard)/ticketing/` — authenticated Ticketing admin dashboard and controls.
-- `app/api/admin/ticketing/` — owner/admin-session-protected event management, scanning, transfer review, operations and demand-insights APIs.
+- `app/admin/` — redirects Ticketing administrators to the Online Bar control panel.
+- `app/api/admin/ticketing/` — owner/admin-session-protected management APIs; customer checkout and guest wallet routes remain separate.
 - `app/api/ticketing/` — Paystack checkout, signed webhook, verified payment return, public verification and guest ticket-wallet APIs.
 - `lib/ticketing/` — server-only public listing and payment/guest-wallet services.
 - `app/api/admin/ticketing/events/[eventId]/image/` — authenticated event-photo uploads and replacements.
@@ -19,13 +19,11 @@ Import `Davi-d-M/TICKETING` into Vercel and use the repository root as the Root 
 
 Configure these server-only variables in the Vercel project before enabling database-backed customer pages or checkout. The complete commerce and release-gate variable list, including test-mode settings, is in [ticketing/README.md](./ticketing/README.md); do not enable live sales before its acceptance checklist passes.
 
-The Ticketing deployment includes its own authenticated admin at `/admin/ticketing` (`/admin` redirects there). Configure the Ticketing admin credentials and MFA/session secrets below. To share ticket data with Online Bar Admin or read the published customer theme, configure `NEXT_PUBLIC_SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` here to the **same Supabase project** used by Online Bar Admin. Customer ticket records remain in isolated `ticketing_*` tables. The customer theme API is read-only and does not expose database credentials.
+Use Online Bar Admin → Ticketing at `/lord/ticketing` for event and tier configuration, publishing, sales reporting, gate staff, security readiness, live operations, transfer review, demand insights, and Ticketing MFA enrollment. The protected `/admin` routes redirect to Online Bar. Keep payment-provider, service-role, MFA, encryption, and signing secrets server-side in the appropriate Vercel deployment settings; never put them into a browser-editable admin field. To share ticket data with Online Bar Admin or read the published customer theme, configure `NEXT_PUBLIC_SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` here to the **same Supabase project** used by Online Bar Admin. Customer ticket records remain in isolated `ticketing_*` tables. The customer theme API is read-only and does not expose database credentials.
 
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (public URL, not a secret).
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key; server-side only.
-- `TICKETING_ADMIN_EMAIL` and `TICKETING_ADMIN_PASSWORD` — dedicated Ticketing admin sign-in; the password must be at least 16 characters.
-- `TICKETING_ADMIN_ROLE` — optional `owner` (default) or `admin`.
-- `TICKETING_SESSION_SECRET` and `TICKETING_MFA_ENCRYPTION_KEY` — independent random server-only secrets of at least 32 characters.
+- `TICKETING_ADMIN_EMAIL`, `TICKETING_ADMIN_PASSWORD`, `TICKETING_ADMIN_ROLE`, `TICKETING_SESSION_SECRET` and `TICKETING_MFA_ENCRYPTION_KEY` — Ticketing's admin authentication and checkout readiness settings. Keep them server-side and follow the MFA enrollment guidance in [ticketing/README.md](./ticketing/README.md).
 
 ## Database setup
 
@@ -53,7 +51,7 @@ The Live Operations view reads committed operational changes from an append-only
 
 The verification migration adds safe customer verification, event-and-gate-assigned staff accounts, rate limits, atomic scan retry protection, security metrics and owner-approved ticket transfers. The MFA migration stores encrypted TOTP seeds, prevents authenticator-code replay atomically, and records activation/verification in the append-only audit log. The waves migration adds configurable Wave I/II/III editions per admission type with scheduled, previous-wave-sold-out/deadline, or owner-controlled manual activation. Wave-specific inventory and tier prices remain separate, and reservations enforce the release rule in the database.
 
-The demand-intelligence migration adds a service-role-only, consent-gated signal table and an owner/admin report at `/admin/ticketing/insights`. Visitors can allow or decline analytics and change that choice from the privacy control on ticket pages. With consent, the app records event-detail views, searches (excluding email- or phone-like text), selected city/date/price filters, and checkout starts using a session-only random visitor ID. It does not store IP addresses, names, emails, device fingerprints, or location coordinates. Paid orders and revenue in reports come from verified `paid` order records, not browser signals. Reports show descriptive 7/30/90-day counts, unmet search terms, and popular city filters; they are not demand forecasts, attribution, cross-device identity stitching, or an external analytics warehouse.
+The demand-intelligence migration adds a service-role-only, consent-gated signal table and an owner/admin report at Online Bar Admin → Ticketing → **Demand insights**. Visitors can allow or decline analytics and change that choice from the privacy control on ticket pages. With consent, the app records event-detail views, searches (excluding email- or phone-like text), selected city/date/price filters, and checkout starts using a session-only random visitor ID. It does not store IP addresses, names, emails, device fingerprints, or location coordinates. Paid orders and revenue in reports come from verified `paid` order records, not browser signals. Reports show descriptive 7/30/90-day counts, unmet search terms, and popular city filters; they are not demand forecasts, attribution, cross-device identity stitching, or an external analytics warehouse.
 
 ## Local development
 
