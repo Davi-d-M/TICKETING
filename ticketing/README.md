@@ -33,6 +33,18 @@ Review all SQL files and confirm the target Supabase project before applying the
 9. `supabase/TICKETING_WAVES_MIGRATION.sql`
 10. `supabase/TICKETING_DEMAND_INTELLIGENCE_MIGRATION.sql`
 
+### Online Bar payment ledger
+
+Online Bar Admin → Ticketing → **Ticket sales** (`/lord/ticketing/sales`) reads verified paid orders and successful refunds from these same `ticketing_*` tables. For the ledger to show payments from this app:
+
+1. Set this app's `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the exact Supabase project used by Online Bar Admin. Never expose the service-role key in browser code.
+2. Apply the Ticketing migrations above to that shared project.
+3. Apply `supabase/TICKETING_SALES_REPORT_MIGRATION.sql` from the Online Bar repository to the same project. It installs the restricted `ticketing_admin_sales_report` function used by the admin ledger.
+4. Keep Ticketing's checkout, Paystack webhook and Online Bar Admin connected to that same Supabase project. A separate database will produce a separate ledger.
+5. After deploying both apps, open `/lord/ticketing/sales` in Online Bar Admin and use **Refresh**. The report includes only server-verified paid orders and successful refunds, not pending or failed attempts.
+
+The Ticketing public URL for this deployment is `https://ticket-six-rho.vercel.app`. Use it as `TICKETING_PUBLIC_URL` only while that is the active production domain; the Paystack callback is `/tickets/complete` and the webhook endpoint is `/api/ticketing/paystack/webhook` on that same host.
+
 Apply the MFA migration and configure `TICKETING_MFA_ENCRYPTION_KEY` and `TICKETING_QR_SIGNING_SECRET` before deploying this version: admin login will intentionally refuse to issue a session until the MFA migration/key are available, and wallet QR issuance/scanning needs the QR key. Do not remove the server-side encryption key after enrollment.
 
 The waves migration adds Wave I — The Awakening, Wave II — The Summoning and Wave III — The Final Call to the existing ticket-type model. Each admission type (for example General Admission or VIP) can have its own three releases, prices, allocations, benefits, sale windows, opening rule and visual theme. Scheduled waves open at their configured time; sell-out waves open only after their matching previous admission wave is fully sold/reserved or its sales deadline passes; manual waves stay closed until the owner activates them. Inventory reservations and checkout enforce the same transition rules transactionally. Configure only confirmed prices, allocations and benefits in the admin.
