@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { getPublishedTicketTheme } from '@/lib/ticketing/theme.server';
+import TicketDemandConsent from './TicketDemandConsent';
 import TicketThemeSync from './TicketThemeSync';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export default async function TicketingLayout({ children }: { children: ReactNod
   return (
     <div className="ticket-theme-scope" data-ticket-theme={theme}>
       <TicketThemeSync />
+      <TicketDemandConsent />
       {children}
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, LocateFixed, MapPin, Search, SlidersHorizontal } from 'lucide-react';
 import type { PublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
+import { recordTicketingDemand } from '@/lib/ticketing/demandSignals';
 
 const TicketEventMap = dynamic(() => import('@/app/tickets/TicketEventMap'), {
   ssr: false,
@@ -196,6 +197,33 @@ export default function TicketEventDiscovery({ events }: { events: PublicTicketE
         return new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime();
       });
   }, [city, dateFilter, events, maximumPrice, origin, query, sort]);
+
+  useEffect(() => {
+    const search = query.trim();
+    if (search.length < 2) return;
+    const timeout = window.setTimeout(() => {
+      recordTicketingDemand({
+        type: 'event_search',
+        metadata: { query: search, zeroResults: filteredEvents.length === 0, results: filteredEvents.length }
+      });
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [filteredEvents.length, query]);
+
+  useEffect(() => {
+    if (!city && dateFilter === 'any' && !maximumPrice) return;
+    const timeout = window.setTimeout(() => {
+      recordTicketingDemand({
+        type: 'filter',
+        metadata: {
+          city: city || null,
+          dateRange: dateFilter,
+          priceCeilingKes: maximumPrice ? Number(maximumPrice) : null
+        }
+      });
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [city, dateFilter, maximumPrice]);
 
   function useMyLocation() {
     if (!navigator.geolocation) {

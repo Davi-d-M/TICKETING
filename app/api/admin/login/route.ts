@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
   const adminEmail = process.env.TICKETING_ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = process.env.TICKETING_ADMIN_PASSWORD;
   const secret = process.env.TICKETING_SESSION_SECRET;
-  if (!adminEmail || !adminPassword || !secret || secret.length < 32) {
+  if (!adminEmail || !adminPassword || adminPassword.length < 16 || !secret || secret.length < 32) {
     return NextResponse.json({
-      error: 'Ticketing admin sign-in is not configured. Set TICKETING_ADMIN_EMAIL, TICKETING_ADMIN_PASSWORD and a 32-character TICKETING_SESSION_SECRET in the Vercel project environment.'
+      error: 'Ticketing admin sign-in is not configured. Set TICKETING_ADMIN_EMAIL, a TICKETING_ADMIN_PASSWORD of at least 16 characters, and a 32-character TICKETING_SESSION_SECRET in the Vercel project environment.'
     }, { status: 503 });
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useRef, useState } from 'react';
+import { recordTicketingDemand } from '@/lib/ticketing/demandSignals';
 
 type Props = {
   eventId: string;
@@ -83,6 +84,7 @@ export default function PurchaseForm({ eventId, ticketTypeId, name, price, servi
     }
     setSaving(true);
     setError('');
+    recordTicketingDemand({ type: 'checkout_intent', eventId, metadata: { quantity } });
     idempotencyKey.current ??= crypto.randomUUID();
     try {
       const response = await fetch('/api/ticketing/checkout', {

@@ -7,6 +7,7 @@ import { getPublicTicketEvent } from '@/lib/ticketing/publicEvents.server';
 import { isTicketingSalesReady } from '@/lib/ticketing/commerce.server';
 import { getVenueMapLinks } from '@/lib/ticketing/venueLinks';
 import PurchaseForm from '../PurchaseForm';
+import TicketDemandBeacon from '../TicketDemandBeacon';
 import TicketingBrand from '../TicketingBrand';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,7 @@ export default async function TicketEventPage({ params }: PageProps) {
   return (
     <>
     <TicketingBrand />
+    <TicketDemandBeacon eventId={event.id} />
     <main className="relative min-h-screen overflow-hidden bg-[#0d0a12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none absolute -left-36 top-24 h-96 w-96 rounded-full bg-orange-500/10 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-32 top-[34rem] h-96 w-96 rounded-full bg-violet-600/10 blur-[110px]" />

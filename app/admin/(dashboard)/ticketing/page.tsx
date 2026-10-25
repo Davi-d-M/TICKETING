@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BadgeCheck,
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -866,6 +867,7 @@ export default function TicketingPage() {
             <div className="flex gap-2">
               <Link href="/admin/ticketing/scan" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-orange-300/20 bg-orange-300/5 px-4 text-sm font-bold text-orange-100 transition hover:bg-orange-300/10"><ScanLine size={15} /> Gate scanner</Link>
               <Link href="/admin/ticketing/transfers" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-300/20 bg-amber-300/5 px-4 text-sm font-bold text-amber-100 transition hover:bg-amber-300/10"><Users size={15} /> Transfer review</Link>
+              <Link href="/admin/ticketing/insights" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-300/20 bg-sky-300/5 px-4 text-sm font-bold text-sky-100 transition hover:bg-sky-300/10"><BarChart3 size={15} /> Demand insights</Link>
               <Link href="/admin/ticketing/security" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/5 px-4 text-sm font-bold text-violet-100 transition hover:bg-violet-300/10"><ShieldAlert size={15} /> Trust centre</Link>
               <Link href="/admin/ticketing/live" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/5 px-4 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/10"><ScanLine size={15} /> Live operations</Link>
               <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 text-sm font-bold text-white transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
