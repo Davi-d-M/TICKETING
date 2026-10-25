@@ -53,6 +53,9 @@ select {
   --ticket-wave-crimson-soft: rgb(244 63 94 / 10%);
   --ticket-wave-violet-soft: rgb(167 139 250 / 10%);
   --ticket-wave-amber-soft: rgb(251 191 36 / 10%);
+  --ticket-checkout-paused-bg: rgb(124 45 18 / 30%);
+  --ticket-checkout-paused-border: rgb(251 146 60 / 45%);
+  --ticket-checkout-paused-text: #ffedd5;
   min-height: 100vh;
   background: var(--ticket-page);
   color: var(--ticket-text);
@@ -82,6 +85,9 @@ select {
   --ticket-wave-crimson-soft: #fff1f2;
   --ticket-wave-violet-soft: #f5f3ff;
   --ticket-wave-amber-soft: #fffbeb;
+  --ticket-checkout-paused-bg: #fff7ed;
+  --ticket-checkout-paused-border: #fed7aa;
+  --ticket-checkout-paused-text: #9a3412;
   color-scheme: light;
 }
 
@@ -107,6 +113,9 @@ select {
   --ticket-wave-crimson-soft: #fff1f2;
   --ticket-wave-violet-soft: #f5f3ff;
   --ticket-wave-amber-soft: #fffbeb;
+  --ticket-checkout-paused-bg: #fff7ed;
+  --ticket-checkout-paused-border: #fed7aa;
+  --ticket-checkout-paused-text: #9a3412;
   color-scheme: light;
 }
 
@@ -132,6 +141,9 @@ select {
   --ticket-wave-crimson-soft: #fff1f2;
   --ticket-wave-violet-soft: #f5f3ff;
   --ticket-wave-amber-soft: #fffbeb;
+  --ticket-checkout-paused-bg: #fff7ed;
+  --ticket-checkout-paused-border: #fed7aa;
+  --ticket-checkout-paused-text: #9a3412;
   color-scheme: light;
 }
 
@@ -269,6 +281,12 @@ select {
 .ticket-theme-scope .ticket-wave-accent[data-wave-theme="obsidian-gold"] {
   background: var(--ticket-wave-amber-soft) !important;
   border-color: var(--ticket-wave-amber-accent) !important;
+}
+
+.ticket-theme-scope .ticket-checkout-paused {
+  background: var(--ticket-checkout-paused-bg) !important;
+  border-color: var(--ticket-checkout-paused-border) !important;
+  color: var(--ticket-checkout-paused-text) !important;
 }
 
 .ticket-theme-scope .ticket-wallet-qr {
